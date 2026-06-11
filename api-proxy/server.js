@@ -21,7 +21,22 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-async function fetchJson(url, timeoutMs = 35000) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableError(error) {
+  const message = String(error?.message || "");
+  return (
+    message.includes("HTTP 502") ||
+    message.includes("HTTP 503") ||
+    message.includes("HTTP 504") ||
+    message.includes("aborted") ||
+    message.includes("fetch failed")
+  );
+}
+
+async function fetchJsonOnce(url, timeoutMs = 35000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -45,6 +60,17 @@ async function fetchJson(url, timeoutMs = 35000) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchJson(url, timeoutMs = 35000, retries = 2) {
+  let last = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    last = await fetchJsonOnce(url, timeoutMs);
+    if (last.ok) return last;
+    if (attempt === retries || !isRetryableError(last.error)) return last;
+    await sleep(2500 + attempt * 3500);
+  }
+  return last || { ok: false, error: "Request failed" };
 }
 
 function formatNumber(value) {
