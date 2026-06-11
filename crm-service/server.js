@@ -33,6 +33,7 @@ const TARGET_MANAGER_IDS = [
   "101503",
   "101521",
   "101527",
+  "102581",
 ];
 mkdirSync(resolve(__dirname, "data"), { recursive: true });
 
