@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KAU Intelligence Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">KAU</span>
+        <div>
+          <strong>Intelligence Center</strong>
+          <span>LiveDune + market radar</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="livedune">LiveDune обзор</button>
+        <button class="nav-item" data-view="own">Мои аккаунты</button>
+        <button class="nav-item" data-view="compare">Сравнение</button>
+        <button class="nav-item" data-view="universityTrends">Тренды соцсетей</button>
+        <button class="nav-item" data-view="kazakhstanDigest">Казахстан СМИ</button>
+        <button class="nav-item" data-view="signals">Рынок и новости</button>
+        <button class="nav-item" data-view="mentions">Упоминания KAU</button>
+      </nav>
+
+      <div class="system-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Проверка LiveDune</span>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="sectionEyebrow">Social analytics desk</p>
+          <h1 id="pageTitle">LiveDune дашборд KAU</h1>
+        </div>
+        <div class="actions">
+          <select id="periodSelect" class="select">
+            <option value="7d">7 дней</option>
+            <option value="30d" selected>30 дней</option>
+            <option value="90d">90 дней</option>
+          </select>
+          <button class="secondary" id="refreshBtn">Обновить экран</button>
+          <button class="primary" id="collectBtn">Собрать данные</button>
+        </div>
+      </header>
+
+      <section class="metrics-grid" aria-label="Ключевые показатели">
+        <article class="metric">
+          <span id="metricOneLabel">Аккаунтов в мониторинге</span>
+          <strong id="metricOne">0</strong>
+        </article>
+        <article class="metric">
+          <span id="metricTwoLabel">Упоминания KAU</span>
+          <strong id="metricTwo">0</strong>
+        </article>
+        <article class="metric">
+          <span id="metricThreeLabel">Средняя релевантность</span>
+          <strong id="metricThree">0</strong>
+        </article>
+        <article class="metric">
+          <span id="metricFourLabel">Статус LiveDune</span>
+          <strong id="metricFour">-</strong>
+        </article>
+      </section>
+
+      <section class="livedune-grid" id="liveduneView">
+        <div class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Own dashboards</p>
+              <h2>Мои аккаунты KAU</h2>
+            </div>
+            <span id="ownCount">0 аккаунтов</span>
+          </div>
+          <div class="account-grid" id="ownAccounts"></div>
+        </div>
+
+        <div class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Analytics comparison</p>
+              <h2>Сравнение с конкурентами</h2>
+            </div>
+            <span id="comparisonCount">0 строк</span>
+          </div>
+          <div class="comparison-table-wrap">
+            <table class="comparison-table">
+              <thead>
+                <tr>
+                  <th>Бренд</th>
+                  <th>Тип</th>
+                  <th>Аккаунты</th>
+                  <th>Подписчики</th>
+                  <th>ER</th>
+                  <th>Посты</th>
+                  <th>Взаимодействия</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody id="comparisonRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header compact">
+            <h2>Конкуренты</h2>
+          </div>
+          <div class="account-list" id="competitorAccounts"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header compact">
+            <h2>Что нужно для живых метрик</h2>
+          </div>
+          <div class="setup-list">
+            <div><strong>1</strong><span>Добавить аккаунты KAU и конкурентов в LiveDune.</span></div>
+            <div><strong>2</strong><span>Указать `account_id`, если API требует ID вместо handle.</span></div>
+            <div><strong>3</strong><span>Подтвердить endpoint статистики из Swagger LiveDune.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="signals-view hidden" id="signalsView">
+        <section class="controls">
+          <div class="search-field">
+            <label for="searchInput">Поиск</label>
+            <input id="searchInput" type="search" placeholder="KAU, admissions, AI, Narxoz..." />
+          </div>
+          <div class="tabs" id="tagTabs">
+            <button class="tab active" data-tag="">Все</button>
+          </div>
+        </section>
+
+        <section class="layout">
+          <div class="panel news-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Signal stream</p>
+                <h2 id="feedTitle">Главная лента</h2>
+              </div>
+              <span id="feedCount">0 материалов</span>
+            </div>
+            <div class="news-list" id="newsList"></div>
+          </div>
+
+          <div class="side-stack">
+            <section class="panel">
+              <div class="panel-header compact">
+                <h2>Теги</h2>
+              </div>
+              <div class="bars" id="tagBars"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header compact">
+                <h2>Источники</h2>
+              </div>
+              <div class="sources" id="sourceList"></div>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <section class="trend-view hidden" id="trendView">
+        <div class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">AI trend agent</p>
+              <h2>Темы с потенциалом для университетов</h2>
+            </div>
+            <span id="trendUpdated">-</span>
+          </div>
+          <div class="trend-grid" id="trendGrid"></div>
+        </div>
+
+        <div class="panel wide">
+          <div class="panel-header compact">
+            <h2>Покрытие платформ</h2>
+          </div>
+          <div class="platform-grid" id="platformGrid"></div>
+        </div>
+      </section>
+
+      <section class="digest-view hidden" id="digestView">
+        <div class="panel wide">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Kazakhstan media digest</p>
+              <h2>Выжимка по казахстанским СМИ</h2>
+            </div>
+            <span id="digestUpdated">-</span>
+          </div>
+          <div class="digest-source-grid" id="digestSources"></div>
+        </div>
+
+        <div class="panel wide">
+          <div class="panel-header compact">
+            <h2>Темы из казахстанской повестки</h2>
+          </div>
+          <div class="digest-theme-grid" id="digestThemes"></div>
+        </div>
+
+        <div class="panel wide">
+          <div class="panel-header compact">
+            <h2>Топ материалов</h2>
+          </div>
+          <div class="news-list" id="digestTop"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

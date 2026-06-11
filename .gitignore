@@ -1,0 +1,11 @@
+.env
+.env.local
+*.log
+*.out.log
+*.err.log
+.meta-session.json
+.meta-oauth-state.json
+.tiktok-session.json
+__pycache__/
+*.pyc
+node_modules/

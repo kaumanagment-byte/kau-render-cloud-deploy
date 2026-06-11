@@ -1,0 +1,78 @@
+services:
+  - type: web
+    name: kau-command-center-api
+    runtime: node
+    rootDir: api-proxy
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ADS_BASE_URL
+        sync: false
+      - key: CRM_BASE_URL
+        sync: false
+      - key: INTELLIGENCE_BASE_URL
+        sync: false
+      - key: TILDA_ORIGIN
+        value: "*"
+
+  - type: web
+    name: kau-ads-service
+    runtime: node
+    rootDir: ads-service
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BASE_URL
+        sync: false
+      - key: META_GRAPH_VERSION
+        value: v24.0
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: META_ACCESS_TOKEN
+        sync: false
+      - key: META_AD_ACCOUNT_IDS
+        sync: false
+      - key: TIKTOK_APP_ID
+        sync: false
+      - key: TIKTOK_APP_SECRET
+        sync: false
+      - key: TIKTOK_REDIRECT_URI
+        sync: false
+      - key: TIKTOK_ACCESS_TOKEN
+        sync: false
+      - key: TIKTOK_ADVERTISER_IDS
+        sync: false
+      - key: GOOGLE_ADS_DEVELOPER_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_ACCESS_TOKEN
+        sync: false
+      - key: GOOGLE_ADS_LOGIN_CUSTOMER_ID
+        sync: false
+      - key: GOOGLE_ADS_CUSTOMER_IDS
+        sync: false
+      - key: GOOGLE_ADS_REFRESH_TOKEN
+        sync: false
+
+  - type: web
+    name: kau-crm-service
+    runtime: node
+    rootDir: crm-service
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BITRIX24_WEBHOOK_URL
+        sync: false
+      - key: POLL_INTERVAL_SECONDS
+        value: "60"
+
+  - type: web
+    name: kau-intelligence-service
+    runtime: python
+    rootDir: intelligence-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: python dashboard_server.py
+    envVars:
+      - key: LIVEDUNE_API_KEY
+        sync: false

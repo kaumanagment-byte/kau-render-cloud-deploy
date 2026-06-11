@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Центр рекламы</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Навигация дашборда">
+        <div class="brand">
+          <span class="brand-mark">AC</span>
+          <div>
+            <strong>Центр рекламы</strong>
+            <span>Контроль рекламы</span>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-view="overview">
+            <span aria-hidden="true">OV</span>
+            Обзор
+          </button>
+          <button class="nav-item" type="button" data-view="accounts">
+            <span aria-hidden="true">AC</span>
+            Аккаунты
+          </button>
+          <button class="nav-item" type="button" data-view="alerts">
+            <span aria-hidden="true">AL</span>
+            Риски
+          </button>
+          <button class="nav-item" type="button" data-view="settings">
+            <span aria-hidden="true">API</span>
+            API
+          </button>
+        </nav>
+
+        <div class="sync-panel">
+          <span class="status-dot"></span>
+          <div>
+            <strong>Онлайн</strong>
+            <span id="syncText">Только что обновлено</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Meta, Google Ads, TikTok Ads</p>
+            <h1>Дашборд рекламы</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="rate-badge" id="rateBadge">Загрузка USD/KZT</span>
+            <label class="select-label" for="rangeSelect">Период</label>
+            <select id="rangeSelect">
+              <option value="today">Сегодня</option>
+              <option value="7d">Последние 7 дней</option>
+              <option value="30d">Последние 30 дней</option>
+            </select>
+            <button class="icon-button" id="refreshButton" type="button" title="Обновить метрики" aria-label="Обновить метрики">
+              ↻
+            </button>
+          </div>
+        </header>
+
+        <section class="filters" aria-label="Фильтры платформ" data-views="overview accounts alerts">
+          <button class="filter-chip active" type="button" data-platform="all">Все платформы</button>
+          <button class="filter-chip" type="button" data-platform="Meta">Meta</button>
+          <button class="filter-chip" type="button" data-platform="Google">Google</button>
+          <button class="filter-chip" type="button" data-platform="TikTok">TikTok</button>
+          <input id="searchInput" class="filter-input" type="search" placeholder="Поиск кампаний или таргетинга" />
+          <select id="statusSelect" class="filter-select">
+            <option value="all">Все статусы</option>
+            <option value="active">Активные</option>
+            <option value="watch">Нужна проверка</option>
+            <option value="paused">На паузе</option>
+          </select>
+          <select id="spendSelect" class="filter-select">
+            <option value="all">Все расходы</option>
+            <option value="with_spend">Есть расход</option>
+            <option value="no_spend">Без расхода</option>
+          </select>
+        </section>
+
+        <section class="integration-strip" aria-label="Статус интеграций" data-views="overview settings">
+          <div class="integration-card">
+            <span>Meta</span>
+            <strong id="metaStatus">Проверка</strong>
+          </div>
+          <div class="integration-card">
+            <span>TikTok</span>
+            <strong id="tiktokStatus">Проверка</strong>
+          </div>
+          <div class="integration-card">
+            <span>Google Ads</span>
+            <strong id="googleStatus">Проверка</strong>
+          </div>
+        </section>
+
+        <section class="kpi-grid" aria-label="Основные метрики" data-views="overview accounts alerts">
+          <article class="metric-card">
+            <span>Расход</span>
+            <strong id="spendMetric">KZT 0</strong>
+            <small id="spendDelta">0%</small>
+          </article>
+          <article class="metric-card">
+            <span>Результаты</span>
+            <strong id="revenueMetric">0</strong>
+            <small id="revenueDelta">0%</small>
+          </article>
+          <article class="metric-card">
+            <span>CPL / CPA</span>
+            <strong id="roasMetric">-</strong>
+            <small id="roasDelta">0%</small>
+          </article>
+          <article class="metric-card">
+            <span>Активный таргетинг</span>
+            <strong id="cpaMetric">0</strong>
+            <small id="cpaDelta">0%</small>
+          </article>
+        </section>
+
+        <section class="content-grid" data-views="charts" hidden>
+          <div class="panel chart-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Расход и результаты</h2>
+                <p>Обновляется каждые пять секунд</p>
+              </div>
+              <div class="legend">
+                <span><i class="legend-spend"></i>Расход</span>
+                <span><i class="legend-revenue"></i>Результаты</span>
+              </div>
+            </div>
+            <canvas id="trendChart" width="920" height="340" aria-label="Тренд расхода и результатов"></canvas>
+          </div>
+
+          <div class="panel health-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Состояние аккаунтов</h2>
+                <p>Темп расхода бюджета и риски открутки</p>
+              </div>
+            </div>
+            <div id="healthList" class="health-list"></div>
+          </div>
+        </section>
+
+        <section class="panel recommendations-section" data-views="overview alerts">
+          <div class="panel-header">
+            <div>
+              <h2>Рекомендации</h2>
+              <p>Приоритетные действия по кампаниям и таргетингу</p>
+            </div>
+          </div>
+          <div id="recommendationList" class="recommendation-list"></div>
+        </section>
+
+        <section class="panel accounts-section" data-views="accounts settings">
+          <div class="panel-header">
+            <div>
+              <h2>Рекламные аккаунты</h2>
+              <p>Сводка по Meta, TikTok и Google Ads</p>
+            </div>
+            <button class="secondary-button" id="connectButton" type="button">Подключить API</button>
+          </div>
+          <div id="accountGrid" class="account-grid"></div>
+        </section>
+
+        <section class="panel table-section" data-views="accounts">
+          <div class="panel-header">
+            <div>
+              <h2>Кампании</h2>
+              <p>Основные метрики кампаний</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Кампания</th>
+                  <th>Платформа</th>
+                  <th>Расход</th>
+                  <th>Конв.</th>
+                  <th>CPA</th>
+                  <th>Ценность</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody id="campaignTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel table-section" data-views="accounts">
+          <div class="panel-header">
+            <div>
+              <h2>Таргетинг</h2>
+              <p>Группы объявлений, аудитории, гео, плейсменты и оптимизация</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="target-table">
+              <thead>
+                <tr>
+                  <th>Группа</th>
+                  <th>Платформа</th>
+                  <th>Гео</th>
+                  <th>Возраст</th>
+                  <th>Пол</th>
+                  <th>Интересы / ключи</th>
+                  <th>Плейсменты</th>
+                  <th>Оптимизация</th>
+                  <th>Бюджет</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody id="targetTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel setup-section" data-views="settings" hidden>
+          <div class="panel-header">
+            <div>
+              <h2>Статус API</h2>
+              <p>Подключения для реальных данных Meta, TikTok и Google Ads</p>
+            </div>
+            <button class="secondary-button" id="openMetaConnect" type="button">Переподключить Meta</button>
+          </div>
+          <div class="setup-grid">
+            <article>
+              <strong>Meta</strong>
+              <span>Подключено. Загружаются аккаунты, кампании и таргетинг.</span>
+            </article>
+            <article>
+              <strong>TikTok</strong>
+              <span>Подключено. Загружаются рекламодатель и группы объявлений.</span>
+            </article>
+            <article>
+              <strong>Google Ads</strong>
+              <span>Настроено, но доступ к данным заблокирован до одобрения Basic или Standard API access в Google Ads.</span>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="connectDialog">
+      <form method="dialog" class="dialog-card">
+        <div class="panel-header">
+          <div>
+            <h2>Подключения API</h2>
+            <p>Добавь токены платформ в `.env`, затем запусти дашборд через `node server.js`.</p>
+          </div>
+          <button class="icon-button" value="close" aria-label="Закрыть">×</button>
+        </div>
+        <div class="connection-grid">
+          <label>
+            ID рекламного аккаунта Meta
+            <input type="text" placeholder="act_123456789" />
+          </label>
+          <label>
+            ID рекламодателей TikTok
+            <input type="text" placeholder="TIKTOK_ADVERTISER_IDS в .env" disabled />
+          </label>
+          <label>
+            ID клиентов Google Ads
+            <input type="text" placeholder="GOOGLE_ADS_CUSTOMER_IDS в .env" disabled />
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="secondary-button" value="close">Отмена</button>
+          <button class="primary-button" id="saveConnection" value="close">Сохранить черновик</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

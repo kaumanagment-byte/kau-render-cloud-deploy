@@ -1,0 +1,126 @@
+{
+  "market": {
+    "country": "Kazakhstan",
+    "languages": ["ru", "en", "kk"],
+    "priority_keywords": [
+      "Kazakhstan higher education",
+      "Kazakhstan university admissions",
+      "education market Kazakhstan",
+      "AI education Kazakhstan",
+      "student recruitment Kazakhstan",
+      "scholarships Kazakhstan",
+      "Central Asia universities",
+      "Kazakhstan labor market",
+      "international university Kazakhstan"
+    ]
+  },
+  "collection": {
+    "rss_timeout_seconds": 8,
+    "gdelt_timeout_seconds": 8,
+    "gdelt_max_records_per_query": 5,
+    "gdelt_max_queries_per_run": 8
+  },
+  "brand_queries": [
+    "\"KAU Kazakh-American University\"",
+    "\"Kazakh-American University\"",
+    "\"Kazakh American University\"",
+    "\"КАУ\" \"Казахско-Американский\"",
+    "\"Kazakh-American University\" Алматы",
+    "\"KAU\" \"Kazakhstan\" \"University\""
+  ],
+  "competitors": [
+    {"name": "KBTU", "website": "https://kbtu.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "kbtu_official", "account_id": 2712721}]},
+    {"name": "SDU University", "website": "https://sdu.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "sdukz", "account_id": 2712722}]},
+    {"name": "Astana IT University", "website": "https://astanait.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "astana_it_university", "account_id": 2712723}]},
+    {"name": "Energo University", "website": "https://aues.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "energo.university", "account_id": 2712724}]},
+    {"name": "ALT University", "website": "https://alt.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "altedukz", "account_id": 2712725}]},
+    {"name": "Maqsut Narikbayev University", "website": "https://mnu.kz", "social_accounts": [{"platform": "instagram", "handle": "mnu.kz", "account_id": 2712727}]},
+    {"name": "Narxoz University", "website": "https://narxoz.kz", "social_accounts": [{"platform": "instagram", "handle": "narxozkz", "account_id": 2712730}]},
+    {"name": "Almaty Management University", "website": "https://almau.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "almau_edu", "account_id": 2712731}]},
+    {"name": "Nazarbayev University", "website": "https://nu.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "nuedukz", "account_id": 2712733}]},
+    {"name": "Satbayev University", "website": "https://satbayev.university", "social_accounts": [{"platform": "instagram", "handle": "satbayev_university", "account_id": 2762274}]},
+    {"name": "KazGASA", "website": "https://kazgasa.kz", "social_accounts": [{"platform": "instagram", "handle": "kazgasa.kz", "account_id": 2883885}]},
+    {"name": "UIB University", "website": "https://uib.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "uib_team", "account_id": 2922932}]},
+    {"name": "KIMEP University", "website": "https://kimep.kz", "social_accounts": [{"platform": "instagram", "handle": "kimep_university", "account_id": 2922933}]},
+    {"name": "Eurasian Technological University", "website": "https://etu.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "metauniversity.kz", "account_id": 2922941}]},
+    {"name": "De Montfort University Kazakhstan", "website": "https://dmu.ac.uk/kazakhstan", "social_accounts": [{"platform": "instagram", "handle": "dmu_kz", "account_id": 3040308}]},
+    {"name": "Turan University", "website": "https://turan.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "univer_turan", "account_id": 3040309}]},
+    {"name": "IITU", "website": "https://iitu.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "iitu_kz", "account_id": 3040311}]},
+    {"name": "Auezov University", "website": "https://auezov.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "auezov_university", "account_id": 3044741}]},
+    {"name": "METU", "website": "https://metu.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "metu.univer", "account_id": 3044742}]},
+    {"name": "Deutsch-Kasachische Universitat", "website": "https://dku.kz", "social_accounts": [{"platform": "instagram", "handle": "dkukz", "account_id": 3044743}]},
+    {"name": "TAU", "website": "https://tau-edu.kz", "social_accounts": [{"platform": "instagram", "handle": "tau_edu.kz", "account_id": 3044744}]},
+    {"name": "Esil University", "website": "https://esil.edu.kz", "social_accounts": [{"platform": "instagram", "handle": "esil_university", "account_id": 3044745}]}
+  ],
+  "own_accounts": [
+    {
+      "name": "KAU Kazakh-American University",
+      "website": "https://kau.kz",
+      "social_accounts": [
+        {"platform": "instagram", "handle": "kau.kz", "account_id": 2979208},
+        {"platform": "tiktok", "handle": "kau.official", "account_id": 3089749},
+        {"platform": "linkedin", "handle": "kazakh-american-university", "account_id": 3115317}
+      ]
+    }
+  ],
+  "rss_feeds": [
+    {
+      "name": "Kazakhstan Media - Tengrinews",
+      "url": "https://tengrinews.kz/news.rss"
+    },
+    {
+      "name": "Kazakhstan Media - NUR",
+      "url": "https://www.nur.kz/rss/all.rss"
+    },
+    {
+      "name": "Kazakhstan Media - Informburo",
+      "url": "https://informburo.kz/rss/pubsubhubbub-feed.xml"
+    },
+    {
+      "name": "Kazakhstan Media - Almaty TV",
+      "url": "https://almaty.tv/news-ru.rss"
+    },
+    {
+      "name": "Kazakhstan Media - Kapital",
+      "url": "https://kapital.kz/feed"
+    },
+    {
+      "name": "Kazakhstan Media - Total",
+      "url": "https://total.kz/rss"
+    },
+    {
+      "name": "Kazakhstan Media - 24.kz",
+      "url": "https://24.kz/ru/news?format=feed"
+    },
+    {
+      "name": "Kazakhstan Media - 24.kz Incidents",
+      "url": "https://24.kz/ru/news/incidents?format=feed&type=rss"
+    },
+    {
+      "name": "Google News - Kazakhstan Education",
+      "url": "https://news.google.com/rss/search?q=Kazakhstan%20higher%20education&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "name": "Google News - KAU English",
+      "url": "https://news.google.com/rss/search?q=%22Kazakh-American%20University%22&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+      "name": "Google News - KAU Russian",
+      "url": "https://news.google.com/rss/search?q=%22%D0%9A%D0%B0%D0%B7%D0%B0%D1%85%D1%81%D0%BA%D0%BE-%D0%90%D0%BC%D0%B5%D1%80%D0%B8%D0%BA%D0%B0%D0%BD%D1%81%D0%BA%D0%B8%D0%B9%20%D1%83%D0%BD%D0%B8%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%82%D0%B5%D1%82%22&hl=ru&gl=KZ&ceid=KZ:ru"
+    }
+  ],
+  "html_sources": [
+    {"name": "Kazakhstan Media - Zakon", "url": "https://www.zakon.kz/", "limit": 30},
+    {"name": "Kazakhstan Media - AZH", "url": "https://azh.kz/ru", "limit": 30},
+    {"name": "Kazakhstan Media - BES.media", "url": "https://bes.media/", "limit": 30}
+  ],
+  "relevance_weights": {
+    "kazakhstan": 5,
+    "kau_brand": 10,
+    "competitor": 6,
+    "education": 4,
+    "ai": 3,
+    "admissions": 4,
+    "labor_market": 3
+  }
+}

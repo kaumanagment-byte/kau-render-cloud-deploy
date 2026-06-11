@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bitrix24 Deal Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Bitrix24 CRM</p>
+          <h1>Контроль обзвона и сделок</h1>
+        </div>
+        <div class="status">
+          <span id="connection-dot" class="dot"></span>
+          <span id="connection-text">Подключение...</span>
+        </div>
+      </header>
+
+      <section class="toolbar" aria-label="Фильтры">
+        <label>
+          Период по дате изменения стадии
+          <select id="range">
+            <option value="today">Сегодня</option>
+            <option value="yesterday">Вчера</option>
+            <option value="7d">7 дней</option>
+            <option value="30d">30 дней</option>
+            <option value="all">За все время</option>
+          </select>
+        </label>
+        <label>
+          Менеджер
+          <select id="manager-filter">
+            <option value="">Все менеджеры</option>
+          </select>
+        </label>
+        <label>
+          Обновление
+          <select id="polling">
+            <option value="15">15 сек</option>
+            <option value="30">30 сек</option>
+            <option value="60">60 сек</option>
+          </select>
+        </label>
+        <button id="refresh" type="button">Обновить</button>
+      </section>
+
+      <section class="metrics" aria-label="Ключевые показатели">
+        <article>
+          <span>Обзвон за период</span>
+          <strong id="moved-count">0</strong>
+          <small id="moved-delta">0 к прошлому периоду</small>
+        </article>
+        <article>
+          <span>Всего сделок</span>
+          <strong id="manager-count">0</strong>
+          <small id="moved-managers">по ответственным</small>
+        </article>
+        <article>
+          <span>Новые осталось</span>
+          <strong id="active-deals">0</strong>
+          <small>стадия “Заявка получена”</small>
+        </article>
+        <article>
+          <span>Теплая / консультации</span>
+          <strong id="won-lost">0 / 0</strong>
+          <small>по текущим статусам</small>
+        </article>
+      </section>
+
+      <section class="layout">
+        <article class="panel wide">
+          <div class="panel-head">
+            <h2>Сотрудники — нагрузка и обработка</h2>
+            <span id="last-updated">Нет данных</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th><button class="sort-btn" data-sort="name">Ответственный</button></th>
+                  <th><button class="sort-btn" data-sort="totalDeals">Всего</button></th>
+                  <th><button class="sort-btn" data-sort="processedAllTime">Обработано</button></th>
+                  <th><button class="sort-btn" data-sort="movedCount">Обзвон</button></th>
+                  <th><button class="sort-btn" data-sort="delta">Рост / спад</button></th>
+                  <th><button class="sort-btn active" data-sort="newLeft">Новые</button></th>
+                  <th><button class="sort-btn" data-sort="warmBase">Теплая</button></th>
+                  <th><button class="sort-btn" data-sort="consultations">Консультации</button></th>
+                  <th><button class="sort-btn" data-sort="noAnswer">Недозвон</button></th>
+                  <th><button class="sort-btn" data-sort="otherSubjects">Другие проф</button></th>
+                </tr>
+              </thead>
+              <tbody id="managers-table"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Блоки статусов</h2>
+            <span id="stage-total">0</span>
+          </div>
+          <div id="stage-list" class="stage-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2>Последние изменения</h2>
+            <span id="range-label">Сегодня</span>
+          </div>
+          <div id="recent-list" class="recent-list"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

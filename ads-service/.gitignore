@@ -1,0 +1,5 @@
+.env
+.meta-session.json
+.meta-oauth-state.json
+.tiktok-session.json
+*.log
