@@ -254,7 +254,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         rows = []
         metrics = self._latest_metric_index()
         for account in config.get("own_accounts", []):
-            rows.append(self._comparison_row(account, "own", metrics))
+            rows.extend(self._own_account_comparison_rows(account, metrics))
         for account in config.get("competitors", []):
             rows.append(self._comparison_row(account, "competitor", metrics))
         return {"rows": rows}
@@ -396,6 +396,43 @@ class DashboardHandler(BaseHTTPRequestHandler):
             "status": "connected" if payload["has_live_data"] else "api_error" if payload.get("last_error") else "waiting_for_livedune_data",
             "error": payload.get("last_error"),
         }
+
+    def _own_account_comparison_rows(self, account: dict, metrics: dict) -> list[dict]:
+        rows = []
+        errors = self._latest_error_index()
+        for social in account.get("social_accounts", []):
+            key = (account["name"], social["platform"], social["handle"])
+            metric_map = metrics.get(key, {})
+            metric_values = {
+                name: metric_map.get(name, {}).get("value")
+                for name in ["followers", "engagement_rate", "posts", "likes", "comments"]
+            }
+            has_live_data = any(isinstance(value, (int, float)) for value in metric_values.values())
+            error = errors.get(key)
+            platform = str(social.get("platform") or "").title()
+            handle = social.get("handle") or social.get("account_id") or "account"
+            rows.append(
+                {
+                    "name": f"{account['name']} · {platform} @{handle}",
+                    "brand": account["name"],
+                    "platform": social.get("platform"),
+                    "handle": social.get("handle"),
+                    "account_id": social.get("account_id"),
+                    "type": "own",
+                    "accounts": 1,
+                    "followers": metric_values["followers"] if has_live_data else None,
+                    "engagement_rate": metric_values["engagement_rate"] if has_live_data else None,
+                    "posts": metric_values["posts"] if has_live_data else None,
+                    "interactions": None,
+                    "status": "connected" if has_live_data else "api_error" if error else "waiting_for_livedune_data",
+                    "error": error,
+                }
+            )
+            if has_live_data:
+                likes = metric_values["likes"] if isinstance(metric_values["likes"], (int, float)) else 0
+                comments = metric_values["comments"] if isinstance(metric_values["comments"], (int, float)) else 0
+                rows[-1]["interactions"] = likes + comments
+        return rows
 
     def api_competitors(self) -> list[dict]:
         return read_config().get("competitors", [])
