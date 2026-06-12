@@ -179,6 +179,15 @@ function countOnlineSources(payload) {
   return Object.values(payload?.sources || {}).filter((source) => source?.ok).length;
 }
 
+function bestCachedResponse(key, now) {
+  const direct = responseCache.get(key);
+  if (direct && now - direct.createdAt < RESPONSE_STALE_TTL_MS) return direct;
+
+  return [...responseCache.values()]
+    .filter((entry) => now - entry.createdAt < RESPONSE_STALE_TTL_MS)
+    .sort((a, b) => countOnlineSources(b.payload) - countOnlineSources(a.payload) || b.createdAt - a.createdAt)[0];
+}
+
 async function unifiedCached(range) {
   const key = String(range || "7d");
   const cached = responseCache.get(key);
@@ -195,16 +204,30 @@ async function unifiedCached(range) {
   const request = (async () => {
     const payload = await unified(key);
     const onlineSources = countOnlineSources(payload);
+    const fallback = bestCachedResponse(key, now);
+    const fallbackOnlineSources = countOnlineSources(fallback?.payload);
+
+    if (fallback && fallbackOnlineSources > onlineSources) {
+      return {
+        ...fallback.payload,
+        cache: {
+          status: "stale",
+          ageSeconds: Math.round((now - fallback.createdAt) / 1000),
+          reason: `current_response_only_${onlineSources}_online`,
+        },
+      };
+    }
+
     if (onlineSources > 0) {
       responseCache.set(key, { payload, createdAt: Date.now() });
       return { ...payload, cache: { status: "updated", ageSeconds: 0 } };
     }
-    if (cached && now - cached.createdAt < RESPONSE_STALE_TTL_MS) {
+    if (fallback) {
       return {
-        ...cached.payload,
+        ...fallback.payload,
         cache: {
           status: "stale",
-          ageSeconds: Math.round((now - cached.createdAt) / 1000),
+          ageSeconds: Math.round((now - fallback.createdAt) / 1000),
           reason: "upstream_rate_limited_or_sleeping",
         },
       };
