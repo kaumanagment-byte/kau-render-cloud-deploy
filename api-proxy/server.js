@@ -5,6 +5,10 @@ const TILDA_ORIGIN = process.env.TILDA_ORIGIN || "*";
 const ADS_BASE_URL = process.env.ADS_BASE_URL || "https://kau-ads-service.onrender.com";
 const INTELLIGENCE_BASE_URL = process.env.INTELLIGENCE_BASE_URL || "https://kau-intelligence-service.onrender.com";
 const CRM_BASE_URL = process.env.CRM_BASE_URL || "https://kau-crm-service.onrender.com";
+const RESPONSE_CACHE_TTL_MS = Number(process.env.RESPONSE_CACHE_TTL_MS || 60_000);
+const RESPONSE_STALE_TTL_MS = Number(process.env.RESPONSE_STALE_TTL_MS || 15 * 60_000);
+const responseCache = new Map();
+const inflightRequests = new Map();
 
 function corsHeaders() {
   return {
@@ -31,6 +35,7 @@ function isRetryableError(error) {
     message.includes("HTTP 502") ||
     message.includes("HTTP 503") ||
     message.includes("HTTP 504") ||
+    message.includes("HTTP 429") ||
     message.includes("aborted") ||
     message.includes("fetch failed")
   );
@@ -168,6 +173,51 @@ async function unified(range) {
   };
 }
 
+function countOnlineSources(payload) {
+  return Object.values(payload?.sources || {}).filter((source) => source?.ok).length;
+}
+
+async function unifiedCached(range) {
+  const key = String(range || "7d");
+  const cached = responseCache.get(key);
+  const now = Date.now();
+
+  if (cached && now - cached.createdAt < RESPONSE_CACHE_TTL_MS) {
+    return { ...cached.payload, cache: { status: "fresh", ageSeconds: Math.round((now - cached.createdAt) / 1000) } };
+  }
+
+  if (inflightRequests.has(key)) {
+    return inflightRequests.get(key);
+  }
+
+  const request = (async () => {
+    const payload = await unified(key);
+    const onlineSources = countOnlineSources(payload);
+    if (onlineSources > 0) {
+      responseCache.set(key, { payload, createdAt: Date.now() });
+      return { ...payload, cache: { status: "updated", ageSeconds: 0 } };
+    }
+    if (cached && now - cached.createdAt < RESPONSE_STALE_TTL_MS) {
+      return {
+        ...cached.payload,
+        cache: {
+          status: "stale",
+          ageSeconds: Math.round((now - cached.createdAt) / 1000),
+          reason: "upstream_rate_limited_or_sleeping",
+        },
+      };
+    }
+    return payload;
+  })();
+
+  inflightRequests.set(key, request);
+  try {
+    return await request;
+  } finally {
+    inflightRequests.delete(key);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -183,7 +233,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/unified") {
-    send(res, 200, await unified(url.searchParams.get("range") || "7d"));
+    send(res, 200, await unifiedCached(url.searchParams.get("range") || "7d"));
     return;
   }
 
