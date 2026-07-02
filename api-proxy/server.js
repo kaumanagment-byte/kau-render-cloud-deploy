@@ -1,10 +1,18 @@
 const http = require("node:http");
+const fs = require("node:fs");
+const path = require("node:path");
+const { tasksDashboard, reviewsDashboard } = require("./tasks-reviews");
+const { enrollmentDashboard, queueStatus } = require("./enrollment-queue");
 
 const PORT = Number(process.env.PORT || 8080);
 const TILDA_ORIGIN = process.env.TILDA_ORIGIN || "*";
 const ADS_BASE_URL = process.env.ADS_BASE_URL || "https://kau-ads-service.onrender.com";
 const INTELLIGENCE_BASE_URL = process.env.INTELLIGENCE_BASE_URL || "https://kau-intelligence-service.onrender.com";
 const CRM_BASE_URL = process.env.CRM_BASE_URL || "https://kau-crm-service.onrender.com";
+const RESPONSE_CACHE_TTL_MS = Number(process.env.RESPONSE_CACHE_TTL_MS || 5 * 60_000);
+const RESPONSE_STALE_TTL_MS = Number(process.env.RESPONSE_STALE_TTL_MS || 15 * 60_000);
+const responseCache = new Map();
+const inflightRequests = new Map();
 
 function corsHeaders() {
   return {
@@ -21,7 +29,23 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-async function fetchJson(url, timeoutMs = 35000) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableError(error) {
+  const message = String(error?.message || "");
+  return (
+    message.includes("HTTP 502") ||
+    message.includes("HTTP 503") ||
+    message.includes("HTTP 504") ||
+    message.includes("HTTP 429") ||
+    message.includes("aborted") ||
+    message.includes("fetch failed")
+  );
+}
+
+async function fetchJsonOnce(url, timeoutMs = 35000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -45,6 +69,17 @@ async function fetchJson(url, timeoutMs = 35000) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchJson(url, timeoutMs = 35000, retries = 2) {
+  let last = null;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    last = await fetchJsonOnce(url, timeoutMs);
+    if (last.ok) return last;
+    if (attempt === retries || !isRetryableError(last.error)) return last;
+    await sleep(2500 + attempt * 3500);
+  }
+  return last || { ok: false, error: "Request failed" };
 }
 
 function formatNumber(value) {
@@ -106,7 +141,7 @@ function buildInsights(data) {
 }
 
 async function unified(range) {
-  const [ads, status, summary, accounts, comparison, trends, digest, mentions, crmConfig, crm] = await Promise.all([
+  const [ads, status, summary, accounts, comparison, trends, digest, mentions, crm] = await Promise.all([
     fetchJson(`${ADS_BASE_URL}/api/dashboard?range=${encodeURIComponent(range)}`, 25000),
     fetchJson(`${INTELLIGENCE_BASE_URL}/api/status`, 10000),
     fetchJson(`${INTELLIGENCE_BASE_URL}/api/summary`, 12000),
@@ -115,10 +150,12 @@ async function unified(range) {
     fetchJson(`${INTELLIGENCE_BASE_URL}/api/trends/university`, 12000),
     fetchJson(`${INTELLIGENCE_BASE_URL}/api/kazakhstan/digest`, 12000),
     fetchJson(`${INTELLIGENCE_BASE_URL}/api/kau/mentions`, 12000),
-    fetchJson(`${CRM_BASE_URL}/api/config`, 12000),
     fetchJson(`${CRM_BASE_URL}/api/deal-dashboard?range=${encodeURIComponent(range)}`, 45000),
   ]);
 
+  const crmConfig = crm.ok
+    ? { ok: true, payload: { configured: true, source: "crm-dashboard" } }
+    : { ok: false, error: crm.error || "CRM unavailable", payload: null };
   const data = { ads, status, summary, accounts, comparison, trends, digest, mentions, crmConfig, crm };
   return {
     fetchedAt: new Date().toISOString(),
@@ -142,6 +179,74 @@ async function unified(range) {
   };
 }
 
+function countOnlineSources(payload) {
+  return Object.values(payload?.sources || {}).filter((source) => source?.ok).length;
+}
+
+function bestCachedResponse(key, now) {
+  const direct = responseCache.get(key);
+  if (direct && now - direct.createdAt < RESPONSE_STALE_TTL_MS) return direct;
+
+  return [...responseCache.values()]
+    .filter((entry) => now - entry.createdAt < RESPONSE_STALE_TTL_MS)
+    .sort((a, b) => countOnlineSources(b.payload) - countOnlineSources(a.payload) || b.createdAt - a.createdAt)[0];
+}
+
+async function unifiedCached(range) {
+  const key = String(range || "7d");
+  const cached = responseCache.get(key);
+  const now = Date.now();
+
+  if (cached && now - cached.createdAt < RESPONSE_CACHE_TTL_MS) {
+    return { ...cached.payload, cache: { status: "fresh", ageSeconds: Math.round((now - cached.createdAt) / 1000) } };
+  }
+
+  if (inflightRequests.has(key)) {
+    return inflightRequests.get(key);
+  }
+
+  const request = (async () => {
+    const payload = await unified(key);
+    const onlineSources = countOnlineSources(payload);
+    const fallback = bestCachedResponse(key, now);
+    const fallbackOnlineSources = countOnlineSources(fallback?.payload);
+
+    if (fallback && fallbackOnlineSources > onlineSources) {
+      return {
+        ...fallback.payload,
+        cache: {
+          status: "stale",
+          ageSeconds: Math.round((now - fallback.createdAt) / 1000),
+          reason: `current_response_only_${onlineSources}_online`,
+        },
+      };
+    }
+
+    if (onlineSources > 0) {
+      responseCache.set(key, { payload, createdAt: Date.now() });
+      return { ...payload, cache: { status: "updated", ageSeconds: 0 } };
+    }
+    if (fallback) {
+      return {
+        ...fallback.payload,
+        cache: {
+          status: "stale",
+          ageSeconds: Math.round((now - fallback.createdAt) / 1000),
+          reason: "upstream_rate_limited_or_sleeping",
+        },
+      };
+    }
+    return payload;
+  })();
+
+  inflightRequests.set(key, request);
+  try {
+    return await request;
+  } finally {
+    inflightRequests.delete(key);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -157,7 +262,41 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/unified") {
-    send(res, 200, await unified(url.searchParams.get("range") || "7d"));
+    send(res, 200, await unifiedCached(url.searchParams.get("range") || "7d"));
+    return;
+  }
+
+  if (url.pathname === "/api/tasks-dashboard") {
+    try { send(res, 200, await tasksDashboard(url.searchParams.get("range") || "7d")); }
+    catch (error) { send(res, 500, { ok: false, error: error.message }); }
+    return;
+  }
+
+  if (url.pathname === "/api/2gis/reviews") {
+    try { send(res, 200, await reviewsDashboard()); }
+    catch (error) { send(res, 500, { ok: false, error: error.message }); }
+    return;
+  }
+
+  if (url.pathname === "/api/enrollment-dashboard") {
+    try { send(res, 200, await enrollmentDashboard()); }
+    catch (error) { send(res, 500, { ok: false, error: error.message }); }
+    return;
+  }
+
+  if (url.pathname === "/api/queue/status") {
+    try { send(res, 200, await queueStatus()); }
+    catch (error) { send(res, 500, { ok: false, error: error.message }); }
+    return;
+  }
+
+  if (["/tasks.html", "/reviews.html", "/enrollment.html"].includes(url.pathname)) {
+    const filePath = path.join(__dirname, "public", path.basename(url.pathname));
+    try {
+      const body = fs.readFileSync(filePath);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(body);
+    } catch { send(res, 404, { error: "Not found" }); }
     return;
   }
 
