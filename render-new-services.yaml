@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: kau-reviews-service
+    runtime: node
+    rootDir: reviews-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: TWOGIS_API_KEY
+        sync: false
+      - key: TWOGIS_BRANCH_ID
+        value: "9429940000796152"
+
+  - type: web
+    name: kau-tasks-service
+    runtime: node
+    rootDir: tasks-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: BITRIX24_WEBHOOK_URL
+        sync: false
+      - key: POLL_INTERVAL_SECONDS
+        value: "60"
+
+  - type: web
+    name: kau-enrollment-service
+    runtime: node
+    rootDir: enrollment-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: ENROLLMENT_XLSX_URL
+        sync: false
+      - key: ENROLLMENT_TARGET_DATE
+        value: "2026-08-25"
+      - key: ENROLLMENT_CACHE_SECONDS
+        value: "300"

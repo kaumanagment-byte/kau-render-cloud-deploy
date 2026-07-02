@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KAU Отзывы 2ГИС</title>
+  <style>
+    :root{--bg:#f4f5f7;--panel:#fff;--text:#17191d;--muted:#747b86;--line:#e1e4e9;--blue:#087bea;--green:#168a4b;--amber:#a76700;--red:#d82737}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,Arial,sans-serif;letter-spacing:0}
+    a{color:inherit}.shell{min-height:100vh;display:grid;grid-template-columns:190px minmax(0,1fr)}
+    aside{position:sticky;top:0;height:100vh;padding:18px 12px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column}
+    .brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}.mark{width:34px;height:34px;border-radius:7px;background:#17191d;color:#fff;display:grid;place-items:center;font-weight:800}.brand strong,.brand span{display:block}.brand span{font-size:12px;color:var(--muted)}
+    nav{display:grid;gap:4px}nav a{text-decoration:none;padding:10px;border-radius:7px;color:#626a75}nav a:hover,nav a.active{background:#e9eaed;color:#1c2026;font-weight:700}
+    .status{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:8px;display:flex;gap:9px;align-items:center}.pulse{width:9px;height:9px;border-radius:50%;background:#31b46b;box-shadow:0 0 0 5px #e4f7ec}.status strong,.status small{display:block}.status small{color:var(--muted)}
+    main{padding:20px;min-width:0}.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:24px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:14px}.eyebrow{text-transform:uppercase;font-size:11px;font-weight:800;color:#667080;margin:0 0 5px}h1{font-size:48px;line-height:1;margin:0}h2,p{margin:0}.lead{margin-top:8px;color:#505762;font-size:17px}.refresh{height:40px;border:0;border-radius:7px;background:var(--blue);color:#fff;padding:0 15px;font-weight:750;cursor:pointer}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.metric{padding:16px;background:#fff;border:1px solid var(--line);border-radius:8px}.metric span,.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:30px;margin:3px 0}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:8px}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.badge{display:inline-flex;padding:4px 8px;border-radius:6px;background:#f0f2f5;color:#5f6874;font-size:12px;font-weight:750}.badge.ok{background:#e8f7ee;color:var(--green)}.badge.warn{background:#fff3da;color:var(--amber)}.badge.error{background:#fdebed;color:var(--red)}
+    .reviews{display:grid}.review{display:grid;grid-template-columns:190px minmax(0,1fr) 310px;gap:18px;padding:18px;border-bottom:1px solid var(--line)}.review:last-child{border-bottom:0}.meta strong,.meta span{display:block}.meta span{color:var(--muted);margin-top:4px}.stars{color:#e09b00;font-size:18px}.comment{font-size:15px;white-space:pre-wrap}.answer-state{margin-top:10px}.action{padding:12px;border-left:3px solid #9aa2ad;background:#f7f8fa;border-radius:0 6px 6px 0}.action.critical{border-color:var(--red);background:#fff4f5}.action.high{border-color:#ef7f1a;background:#fff7ef}.action.medium{border-color:#e0a11b;background:#fffaeb}.action.low{border-color:var(--green);background:#f0faf4}.action strong{display:block;margin-bottom:4px}.action p{color:#4d5560}.empty{padding:30px;color:var(--muted);text-align:center}
+    @media(max-width:1050px){.shell{grid-template-columns:1fr}aside{position:static;height:auto}.status{display:none}.metrics{grid-template-columns:repeat(2,1fr)}.review{grid-template-columns:150px minmax(0,1fr)}.action{grid-column:1/-1}}
+    @media(max-width:650px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:36px}.metrics{grid-template-columns:1fr}.review{grid-template-columns:1fr}.action{grid-column:auto}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand"><span class="mark">KAU</span><div><strong>Command Center</strong><span>Репутация</span></div></div>
+      <nav>
+        <a href="https://kau.kz/marketing/data/bitrex">Общий дашборд</a>
+        <a href="https://kau-tasks-service.onrender.com/">Задачи</a>
+        <a class="active" href="./reviews.html">Отзывы 2ГИС</a>
+        <a href="https://kau-enrollment-service.onrender.com/">План набора</a>
+      </nav>
+      <div class="status"><span class="pulse"></span><div><strong id="status">Подключение</strong><small id="updated">Загрузка отзывов</small></div></div>
+    </aside>
+    <main>
+      <header class="hero">
+        <div><p class="eyebrow">Reputation monitor · 2ГИС</p><h1>Отзывы</h1><p class="lead">Последние комментарии и конкретные действия для команды KAU.</p></div>
+        <button class="refresh" id="refresh" type="button">Обновить</button>
+      </header>
+      <section class="metrics">
+        <article class="metric"><span>Рейтинг</span><strong id="rating">-</strong><small>из 5</small></article>
+        <article class="metric"><span>Всего отзывов</span><strong id="reviewsCount">-</strong><small>по филиалу</small></article>
+        <article class="metric"><span>Без ответа</span><strong id="unanswered">-</strong><small>среди последних 10</small></article>
+        <article class="metric"><span>Негативные</span><strong id="negative">-</strong><small>оценка 1–3</small></article>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Последние 10</p><h2>Комментарии и действия</h2></div><span class="badge" id="count">-</span></div>
+        <div class="reviews" id="reviews"><div class="empty">Загрузка отзывов...</div></div>
+      </section>
+    </main>
+  </div>
+  <script>
+    const $=id=>document.getElementById(id); const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const number=v=>new Intl.NumberFormat("ru-RU").format(Number(v||0));
+    const date=v=>v?new Date(v).toLocaleString("ru-RU",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):"-";
+    const stars=n=>`${"★".repeat(Math.max(0,n))}${"☆".repeat(Math.max(0,5-n))}`;
+    let loading=false;
+    function render(data){
+      $("status").textContent=data.ok?"2ГИС online":"Ошибка 2ГИС"; $("updated").textContent=data.ok?new Date(data.fetchedAt).toLocaleTimeString("ru-RU"):(data.error||"Нет данных");
+      $("rating").textContent=Number(data.rating||0).toFixed(1); $("reviewsCount").textContent=number(data.reviewsCount); $("unanswered").textContent=number(data.unansweredCount); $("negative").textContent=number(data.negativeCount); $("count").textContent=`${number((data.reviews||[]).length)} отзывов`;
+      $("reviews").innerHTML=(data.reviews||[]).map(review=>`<article class="review"><div class="meta"><strong>${esc(review.author)}</strong><span class="stars">${stars(review.rating)}</span><span>${date(review.createdAt)}</span><div class="answer-state"><span class="badge ${review.hasAnswer?"ok":"warn"}">${review.hasAnswer?"Ответ есть":"Нужен ответ"}</span></div></div><p class="comment">${esc(review.text)}</p><div class="action ${esc(review.action?.priority)}"><strong>${esc(review.action?.label)} · Что делать</strong><p>${esc(review.action?.text)}</p></div></article>`).join("")||`<div class="empty">Отзывы не найдены.</div>`;
+    }
+    async function load(){if(loading)return;loading=true;$("refresh").disabled=true;try{const response=await fetch("/api/2gis/reviews",{cache:"no-store"});const data=await response.json();if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);render(data)}catch(error){render({ok:false,error:error.message,reviews:[]})}finally{loading=false;$("refresh").disabled=false}}
+    $("refresh").addEventListener("click",load);load();setInterval(load,60_000);
+  </script>
+</body>
+</html>
