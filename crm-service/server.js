@@ -14,6 +14,8 @@ loadEnv(resolve(__dirname, ".env"));
 const PORT = Number(process.env.PORT || 8787);
 const BITRIX24_WEBHOOK_URL = normalizeWebhookUrl(process.env.BITRIX24_WEBHOOK_URL || "");
 const POLL_INTERVAL_SECONDS = Number(process.env.POLL_INTERVAL_SECONDS || 15);
+const TWOGIS_API_KEY = String(process.env.TWOGIS_API_KEY || "").trim();
+const TWOGIS_BRANCH_ID = String(process.env.TWOGIS_BRANCH_ID || "9429940000796152").trim();
 const clients = new Set();
 const cache = new Map();
 const TARGET_MANAGER_IDS = [
@@ -33,6 +35,7 @@ const TARGET_MANAGER_IDS = [
   "101503",
   "101521",
   "101527",
+  "102581",
 ];
 mkdirSync(resolve(__dirname, "data"), { recursive: true });
 
@@ -80,6 +83,14 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === "/api/deal-dashboard") {
       return await handleDealDashboard(url, res);
+    }
+
+    if (url.pathname === "/api/tasks-dashboard") {
+      return await handleTasksDashboard(url, res);
+    }
+
+    if (url.pathname === "/api/2gis/reviews") {
+      return await handleTwoGisReviews(res);
     }
 
     if (url.pathname === "/api/users") {
@@ -175,6 +186,283 @@ async function handleUsers(res) {
   } catch (error) {
     sendJson(res, { mode: "live", users: [], warning: error.message });
   }
+}
+
+const TASK_STATUS_NAMES = {
+  1: "Новая",
+  2: "Ждёт выполнения",
+  3: "Выполняется",
+  4: "Ждёт контроля",
+  5: "Завершена",
+  6: "Отложена",
+  7: "Отклонена",
+};
+
+async function handleTasksDashboard(url, res) {
+  if (!BITRIX24_WEBHOOK_URL) {
+    return sendJson(res, { ok: false, mode: "demo", error: "Bitrix24 webhook is not configured" }, 503);
+  }
+
+  const rangeName = url.searchParams.get("range") || "7d";
+  const responsibleId = url.searchParams.get("responsible") || "";
+  const cacheKey = `tasks:${rangeName}:${responsibleId}`;
+  const payload = await cached(cacheKey, 20_000, async () => {
+    const bounds = getTaskRange(rangeName);
+    const baseFilter = responsibleId ? { RESPONSIBLE_ID: responsibleId } : {};
+    const [openTasks, createdTasks, closedTasks, users] = await Promise.all([
+      fetchBitrixTasks({ ...baseFilter, STATUS: [1, 2, 3, 4, 6, 7] }, 600),
+      fetchBitrixTasks({ ...baseFilter, ">=CREATED_DATE": bounds.from, "<=CREATED_DATE": bounds.to }, 600),
+      fetchBitrixTasks({ ...baseFilter, ">=CLOSED_DATE": bounds.from, "<=CLOSED_DATE": bounds.to }, 600),
+      cached("users", 5 * 60_000, fetchBitrixUsers),
+    ]);
+    return buildTasksDashboard({ rangeName, bounds, openTasks, createdTasks, closedTasks, users });
+  });
+
+  sendJson(res, payload);
+}
+
+async function handleTwoGisReviews(res) {
+  if (!TWOGIS_API_KEY) {
+    return sendJson(res, { ok: false, error: "2GIS API key is not configured" }, 503);
+  }
+
+  const params = new URLSearchParams({
+    limit: "10",
+    offset: "0",
+    is_advertiser: "false",
+    fields: "meta.providers,meta.branch_rating,meta.branch_reviews_count,meta.total_count,reviews.hiding_reason,reviews.emojis,reviews.trust_factors",
+    sort_by: "date_created",
+    key: TWOGIS_API_KEY,
+    locale: "ru_KZ",
+  });
+  const response = await fetch(`https://public-api.reviews.2gis.com/3.0/branches/${encodeURIComponent(TWOGIS_BRANCH_ID)}/reviews?${params}`, {
+    headers: { Accept: "application/json", "User-Agent": "KAU-Reputation-Monitor/1.0" },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return sendJson(res, { ok: false, error: payload.message || `2GIS HTTP ${response.status}` }, response.status);
+  }
+
+  const reviews = (payload.reviews || []).map((review) => {
+    const rating = Number(review.rating || 0);
+    const hasAnswer = Boolean(review.official_answer);
+    return {
+      id: String(review.id || ""),
+      author: review.user?.name || "Пользователь 2ГИС",
+      rating,
+      text: review.text || "Без текста",
+      createdAt: review.date_created || null,
+      url: review.url || "",
+      likes: Number(review.likes_count || 0),
+      hasAnswer,
+      officialAnswer: review.official_answer || null,
+      action: reviewAction(rating, hasAnswer),
+    };
+  });
+
+  sendJson(res, {
+    ok: true,
+    source: "2gis",
+    branchId: TWOGIS_BRANCH_ID,
+    fetchedAt: new Date().toISOString(),
+    rating: Number(payload.meta?.branch_rating || 0),
+    reviewsCount: Number(payload.meta?.branch_reviews_count || 0),
+    unansweredCount: reviews.filter((review) => !review.hasAnswer).length,
+    negativeCount: reviews.filter((review) => review.rating > 0 && review.rating <= 3).length,
+    reviews,
+  });
+}
+
+function reviewAction(rating, hasAnswer) {
+  if (rating <= 2) {
+    return { priority: "critical", label: "Срочно", text: hasAnswer ? "Проверить, решена ли проблема, и связаться повторно." : "Ответить сегодня, признать проблему и предложить личный контакт для решения." };
+  }
+  if (rating === 3) {
+    return { priority: "high", label: "Разобрать", text: hasAnswer ? "Проверить результат ответа и зафиксировать причину замечания." : "Уточнить детали, дать конкретный срок исправления и назначить ответственного." };
+  }
+  if (rating === 4) {
+    return { priority: "medium", label: "Ответить", text: hasAnswer ? "Учесть замечание в еженедельной сводке." : "Поблагодарить и отдельно ответить на замечание пользователя." };
+  }
+  return { priority: "low", label: "Поддержать", text: hasAnswer ? "Можно использовать отзыв как позитивный сигнал в отчёте." : "Поблагодарить за отзыв и пригласить подписаться на новости KAU." };
+}
+
+async function fetchBitrixTasks(filter, maxItems = 2500) {
+  const tasks = [];
+  let start = 0;
+  const select = [
+    "ID",
+    "TITLE",
+    "DESCRIPTION",
+    "STATUS",
+    "PRIORITY",
+    "RESPONSIBLE_ID",
+    "CREATED_BY",
+    "CREATED_DATE",
+    "CHANGED_DATE",
+    "DEADLINE",
+    "CLOSED_DATE",
+    "CLOSED_BY",
+    "UF_TASK_WEBDAV_FILES",
+  ];
+
+  do {
+    const response = await callBitrix("tasks.task.list", {
+      order: { ID: "DESC" },
+      filter,
+      select,
+      start,
+    });
+    const batch = Array.isArray(response.result?.tasks) ? response.result.tasks : [];
+    tasks.push(...batch);
+    start = typeof response.next === "number" ? response.next : null;
+  } while (start !== null && tasks.length < maxItems);
+
+  return tasks.slice(0, maxItems);
+}
+
+function buildTasksDashboard({ rangeName, bounds, openTasks, createdTasks, closedTasks, users }) {
+  const byId = new Map();
+  for (const task of [...openTasks, ...createdTasks, ...closedTasks]) {
+    byId.set(String(task.id), task);
+  }
+  const usersById = new Map(users.map((user) => [String(user.id), user.name]));
+  const activeUserIds = new Set(usersById.keys());
+  const tasks = [...byId.values()].filter((task) => activeUserIds.has(String(task.responsibleId || "")));
+  const now = new Date();
+  const isClosed = (task) => Number(task.status) === 5 || Boolean(task.closedDate);
+  const isOverdue = (task) => !isClosed(task) && task.deadline && new Date(task.deadline) < now;
+  const hasFiles = (task) => Array.isArray(task.ufTaskWebdavFiles) && task.ufTaskWebdavFiles.length > 0;
+  const currentOpen = tasks.filter((task) => !isClosed(task));
+  const periodClosed = tasks.filter((task) => isClosed(task) && isWithin(task.closedDate, bounds));
+  const periodCreated = tasks.filter((task) => isWithin(task.createdDate, bounds));
+  const overdue = currentOpen.filter(isOverdue);
+  const closedOnTime = periodClosed.filter((task) => !task.deadline || new Date(task.closedDate) <= new Date(task.deadline));
+  const peopleMap = new Map();
+
+  for (const user of users) {
+    peopleMap.set(String(user.id), {
+      id: String(user.id),
+      name: user.name,
+      total: 0,
+      created: 0,
+      open: 0,
+      closed: 0,
+      overdue: 0,
+      withFiles: 0,
+      closedOnTime: 0,
+    });
+  }
+
+  for (const task of tasks) {
+    const id = String(task.responsibleId || "none");
+    const person = peopleMap.get(id) || {
+      id,
+      name: task.responsible?.name || usersById.get(id) || `Сотрудник #${id}`,
+      total: 0,
+      created: 0,
+      open: 0,
+      closed: 0,
+      overdue: 0,
+      withFiles: 0,
+      closedOnTime: 0,
+    };
+    person.total += 1;
+    person.created += isWithin(task.createdDate, bounds) ? 1 : 0;
+    person.open += isClosed(task) ? 0 : 1;
+    person.closed += isClosed(task) && isWithin(task.closedDate, bounds) ? 1 : 0;
+    person.overdue += isOverdue(task) ? 1 : 0;
+    person.withFiles += hasFiles(task) ? 1 : 0;
+    person.closedOnTime += isClosed(task) && isWithin(task.closedDate, bounds) && (!task.deadline || new Date(task.closedDate) <= new Date(task.deadline)) ? 1 : 0;
+    peopleMap.set(id, person);
+  }
+
+  const people = [...peopleMap.values()]
+    .map((person) => ({
+      ...person,
+      withoutFiles: person.total - person.withFiles,
+      closeRate: person.closed + person.open ? Math.round((person.closed / (person.closed + person.open)) * 100) : 0,
+      onTimeRate: person.closed ? Math.round((person.closedOnTime / person.closed) * 100) : 0,
+    }))
+    .sort((a, b) => b.open - a.open || b.closed - a.closed || a.name.localeCompare(b.name, "ru"));
+
+  const rows = tasks
+    .map((task) => {
+      const closed = isClosed(task);
+      const responsible = task.responsible?.name || usersById.get(String(task.responsibleId)) || `Сотрудник #${task.responsibleId}`;
+      const creator = task.creator?.name || usersById.get(String(task.createdBy)) || `Сотрудник #${task.createdBy}`;
+      const closedBy = task.closedBy ? usersById.get(String(task.closedBy)) || `Сотрудник #${task.closedBy}` : null;
+      return {
+        id: String(task.id),
+        title: task.title || `Задача #${task.id}`,
+        statusId: Number(task.status),
+        status: TASK_STATUS_NAMES[Number(task.status)] || String(task.status || ""),
+        priority: Number(task.priority || 1),
+        responsibleId: String(task.responsibleId || ""),
+        responsible,
+        creator,
+        closedBy,
+        createdDate: task.createdDate || null,
+        changedDate: task.changedDate || null,
+        deadline: task.deadline || null,
+        closedDate: task.closedDate || null,
+        durationHours: closed && task.createdDate && task.closedDate
+          ? Math.max(0, Math.round((new Date(task.closedDate) - new Date(task.createdDate)) / 36_000) / 10)
+          : null,
+        hasFiles: hasFiles(task),
+        overdue: Boolean(isOverdue(task)),
+        url: `https://kau.bitrix24.kz/company/personal/user/${task.responsibleId}/tasks/task/view/${task.id}/`,
+      };
+    })
+    .sort((a, b) => String(b.changedDate || b.closedDate || b.createdDate || "").localeCompare(String(a.changedDate || a.closedDate || a.createdDate || "")));
+
+  return {
+    ok: true,
+    mode: "live",
+    fetchedAt: new Date().toISOString(),
+    range: { name: rangeName, ...bounds },
+    summary: {
+      total: tasks.length,
+      created: periodCreated.length,
+      closed: periodClosed.length,
+      open: currentOpen.length,
+      overdue: overdue.length,
+      withFiles: tasks.filter(hasFiles).length,
+      withoutFiles: tasks.filter((task) => !hasFiles(task)).length,
+      closedOnTime: closedOnTime.length,
+      closeRate: periodClosed.length + currentOpen.length ? Math.round((periodClosed.length / (periodClosed.length + currentOpen.length)) * 100) : 0,
+      onTimeRate: periodClosed.length ? Math.round((closedOnTime.length / periodClosed.length) * 100) : 0,
+    },
+    people,
+    tasks: rows,
+  };
+}
+
+function getTaskRange(rangeName) {
+  const now = new Date();
+  const yekaterinburgNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Yekaterinburg" }));
+  const start = new Date(yekaterinburgNow);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(yekaterinburgNow);
+  end.setHours(23, 59, 59, 999);
+  if (rangeName === "yesterday") {
+    start.setDate(start.getDate() - 1);
+    end.setDate(end.getDate() - 1);
+  } else if (rangeName === "7d") {
+    start.setDate(start.getDate() - 6);
+  } else if (rangeName === "30d") {
+    start.setDate(start.getDate() - 29);
+  } else if (rangeName === "all") {
+    start.setFullYear(2020, 0, 1);
+  }
+  const offset = "+05:00";
+  const localIso = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}:${String(date.getSeconds()).padStart(2, "0")}${offset}`;
+  return { from: localIso(start), to: localIso(end) };
+}
+
+function isWithin(value, bounds) {
+  if (!value) return false;
+  const date = new Date(value);
+  return date >= new Date(bounds.from) && date <= new Date(bounds.to);
 }
 
 async function handleDealDashboard(url, res) {
@@ -279,13 +567,16 @@ async function fetchBitrixUsers() {
   let start = 0;
 
   do {
-    const response = await callBitrix("user.get", { start });
+    const response = await callBitrix("user.get", { FILTER: { ACTIVE: true }, start });
     if (Array.isArray(response.result)) {
       users.push(
-        ...response.result.map((user) => ({
-          id: String(user.ID),
-          name: [user.NAME, user.LAST_NAME].filter(Boolean).join(" ") || `Employee #${user.ID}`,
-        })),
+        ...response.result
+          .filter((user) => user.ACTIVE !== false && user.USER_TYPE === "employee")
+          .filter((user) => String(user.ID) !== "90325" && !/^Интегратор\b/i.test(String(user.NAME || "")))
+          .map((user) => ({
+            id: String(user.ID),
+            name: [user.NAME, user.LAST_NAME].filter(Boolean).join(" ").replace(/\s+/g, " ").trim() || `Employee #${user.ID}`,
+          })),
       );
     }
     start = typeof response.next === "number" ? response.next : null;

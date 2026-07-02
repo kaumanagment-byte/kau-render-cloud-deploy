@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KAU Задачи</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --panel: rgba(255, 255, 255, 0.9);
+        --text: #1f2328;
+        --muted: #6b7280;
+        --line: rgba(31, 35, 40, 0.11);
+        --dark: #111827;
+        --blue: #0b66e4;
+        --green: #1f8f4d;
+        --orange: #b85c00;
+        --red: #c62828;
+        --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      button, select { font: inherit; }
+      .shell {
+        display: grid;
+        grid-template-columns: 244px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+      aside {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        padding: 22px 16px;
+        border-right: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.78);
+        backdrop-filter: blur(22px);
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+      .brand, .status, .head, .hero, .actions, .item, .kpis {
+        display: flex;
+        align-items: center;
+      }
+      .brand { gap: 12px; }
+      .mark {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--dark);
+        color: white;
+        font-weight: 850;
+      }
+      .brand strong, .status strong { display: block; }
+      .brand span:last-child, .status span:last-child, small, th, td span, .eyebrow, .card span, .kpis span {
+        color: var(--muted);
+      }
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+      .nav a {
+        min-height: 40px;
+        padding: 11px 12px;
+        border-radius: 8px;
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 720;
+      }
+      .nav a.active, .nav a:hover {
+        background: rgba(17, 24, 39, 0.08);
+        color: var(--text);
+      }
+      .status {
+        margin-top: auto;
+        gap: 12px;
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+      .pulse {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 0 7px rgba(31, 143, 77, 0.12);
+      }
+      main {
+        padding: 22px;
+        display: grid;
+        gap: 16px;
+        align-content: start;
+      }
+      .hero {
+        justify-content: space-between;
+        gap: 22px;
+        min-height: 202px;
+        padding: 34px;
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.78));
+        box-shadow: var(--shadow);
+      }
+      .eyebrow {
+        margin: 0 0 7px;
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0;
+        font-size: clamp(42px, 6vw, 74px);
+        line-height: .98;
+      }
+      h2, p { margin: 0; }
+      .lead {
+        margin-top: 12px;
+        max-width: 680px;
+        color: #444b55;
+        font-size: 19px;
+      }
+      .actions {
+        gap: 10px;
+      }
+      .actions label {
+        display: grid;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+      select, button {
+        height: 40px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        color: var(--text);
+        padding: 0 12px;
+      }
+      button {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: white;
+        cursor: pointer;
+        font-weight: 760;
+      }
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .grid.two { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 16px; }
+      .panel, .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 10px 34px rgba(15, 23, 42, 0.045);
+      }
+      .card, .panel { padding: 18px; }
+      .card strong {
+        display: block;
+        margin: 8px 0 4px;
+        font-size: clamp(28px, 3.4vw, 43px);
+        line-height: 1;
+      }
+      .head {
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .badge {
+        padding: 7px 10px;
+        border-radius: 8px;
+        background: #eef2f7;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 820;
+        white-space: nowrap;
+      }
+      .badge.ok { background: rgba(31, 143, 77, .11); color: var(--green); }
+      .badge.warn { background: rgba(184, 92, 0, .12); color: var(--orange); }
+      .badge.error { background: rgba(198, 40, 40, .11); color: var(--red); }
+      .kpis {
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .kpis div {
+        min-width: 122px;
+        padding: 12px;
+        border-radius: 8px;
+        background: rgba(17, 24, 39, .04);
+      }
+      .kpis strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 24px;
+      }
+      .table {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 850px;
+      }
+      th, td {
+        padding: 12px 13px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+        font-size: 14px;
+      }
+      th {
+        background: rgba(17, 24, 39, .035);
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+      tr:last-child td { border-bottom: 0; }
+      td strong { display: block; }
+      .item {
+        justify-content: space-between;
+        gap: 14px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .item:last-child { border-bottom: 0; }
+      .item em {
+        font-style: normal;
+        font-weight: 820;
+        white-space: nowrap;
+      }
+      .bar {
+        display: grid;
+        grid-template-columns: minmax(120px, 1fr) 1.5fr 48px;
+        align-items: center;
+        gap: 10px;
+        margin: 11px 0;
+      }
+      .track {
+        height: 9px;
+        border-radius: 999px;
+        background: rgba(17, 24, 39, .08);
+        overflow: hidden;
+      }
+      .fill {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--blue);
+      }
+      .empty {
+        padding: 18px;
+        color: var(--muted);
+      }
+      @media (max-width: 980px) {
+        .shell { grid-template-columns: 1fr; }
+        aside {
+          position: static;
+          height: auto;
+        }
+        .grid.four, .grid.two { grid-template-columns: 1fr; }
+        .hero { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell" data-api-base="">
+      <aside>
+        <div class="brand">
+          <span class="mark">KAU</span>
+          <div>
+            <strong>Command Center</strong>
+            <span>Задачи</span>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="https://kau.kz/marketing/data/bitrex">Общий дашборд</a>
+          <a class="active" href="./tasks.html">Задачи</a>
+          <a href="./reviews.html">Отзывы 2ГИС</a>
+        </nav>
+        <div class="status">
+          <span class="pulse"></span>
+          <div>
+            <strong id="healthText">Подключение</strong>
+            <span id="updatedAt">Загрузка задач</span>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <header class="hero">
+          <div>
+            <p class="eyebrow">Bitrix24 Tasks</p>
+            <h1>Задачи</h1>
+            <p class="lead">Кто получил задачи, кто закрыл, где есть файлы, где просрочки и какая эффективность по сотрудникам.</p>
+          </div>
+          <div class="actions">
+            <label>Период
+              <select id="range">
+                <option value="today">Сегодня</option>
+                <option value="yesterday">Вчера</option>
+                <option value="7d" selected>7 дней</option>
+                <option value="30d">30 дней</option>
+                <option value="all">Все</option>
+              </select>
+            </label>
+            <button id="refresh" type="button">Обновить</button>
+          </div>
+        </header>
+
+        <section class="grid four">
+          <article class="card"><span>Всего задач</span><strong id="totalTasks">-</strong><small id="createdMeta">-</small></article>
+          <article class="card"><span>Закрыто</span><strong id="closedTasks">-</strong><small id="closeRate">-</small></article>
+          <article class="card"><span>С файлами</span><strong id="withFiles">-</strong><small id="fileRate">-</small></article>
+          <article class="card"><span>Просрочено</span><strong id="overdueTasks">-</strong><small id="openTasks">-</small></article>
+        </section>
+
+        <section class="grid two">
+          <article class="panel">
+            <div class="head">
+              <div>
+                <p class="eyebrow">Эффективность</p>
+                <h2>По сотрудникам</h2>
+              </div>
+              <span class="badge ok" id="peopleCount">-</span>
+            </div>
+            <div class="table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Сотрудник</th>
+                    <th>Всего</th>
+                    <th>Закрыто</th>
+                    <th>Открыто</th>
+                    <th>Файлы</th>
+                    <th>Просрочка</th>
+                    <th>Эфф.</th>
+                  </tr>
+                </thead>
+                <tbody id="peopleRows"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="head">
+              <div>
+                <p class="eyebrow">Контроль</p>
+                <h2>Файлы и сроки</h2>
+              </div>
+              <span class="badge" id="periodLabel">-</span>
+            </div>
+            <div class="kpis">
+              <div><span>Без файлов</span><strong id="withoutFiles">-</strong></div>
+              <div><span>Закрыто вовремя</span><strong id="onTimeRate">-</strong></div>
+              <div><span>Открытых</span><strong id="openTasksMini">-</strong></div>
+            </div>
+            <div id="fileBars"></div>
+          </article>
+        </section>
+
+        <article class="panel">
+          <div class="head">
+            <div>
+              <p class="eyebrow">Живой контроль · обновление каждые 30 секунд</p>
+              <h2>Все задачи от постановки до закрытия</h2>
+            </div>
+            <span class="badge" id="recentCount">-</span>
+          </div>
+          <div class="table">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Задача</th>
+                  <th>Ответственный</th>
+                  <th>Статус</th>
+                  <th>Создана</th>
+                  <th>Дедлайн</th>
+                  <th>Закрыта</th>
+                  <th>Кто закрыл</th>
+                  <th>Время</th>
+                  <th>Файл</th>
+                </tr>
+              </thead>
+              <tbody id="taskRows"></tbody>
+            </table>
+          </div>
+        </article>
+      </main>
+    </div>
+
+    <script>
+      const root = document.querySelector(".shell");
+      const apiBase = (window.KAU_TASKS_API_BASE || root.dataset.apiBase || "").replace(/\/$/, "");
+      const $ = (id) => document.getElementById(id);
+      const num = (value) => new Intl.NumberFormat("ru-RU").format(Number(value || 0));
+      const pct = (value) => `${num(value)}%`;
+      const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+      const dt = (value) => {
+        if (!value) return "-";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? String(value).slice(0, 16) : date.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      };
+      const badge = (task) => task.overdue ? "error" : task.status === "Завершена" ? "ok" : "warn";
+      let latestPayload = null;
+      let loading = false;
+
+      function renderBars(people) {
+        const max = Math.max(...people.map((item) => item.withoutFiles), 1);
+        $("fileBars").innerHTML = people.slice(0, 8).map((item) => `
+          <div class="bar">
+            <span>${esc(item.name)}</span>
+            <span class="track"><span class="fill" style="width:${Math.max(4, item.withoutFiles / max * 100)}%"></span></span>
+            <strong>${num(item.withoutFiles)}</strong>
+          </div>
+        `).join("") || `<div class="empty">Нет задач без файлов.</div>`;
+      }
+
+      function render(data) {
+        const summary = data.summary || {};
+        $("healthText").textContent = data.ok ? "Bitrix24 online" : "Ошибка Bitrix24";
+        $("updatedAt").textContent = data.ok ? new Date(data.fetchedAt).toLocaleTimeString("ru-RU") : (data.error || "Нет данных");
+        $("totalTasks").textContent = num(summary.total);
+        $("createdMeta").textContent = `${num(summary.created)} создано за период`;
+        $("closedTasks").textContent = num(summary.closed);
+        $("closeRate").textContent = `${pct(summary.closeRate)} закрытия`;
+        $("withFiles").textContent = num(summary.withFiles);
+        $("fileRate").textContent = `${num(summary.withoutFiles)} без файлов`;
+        $("overdueTasks").textContent = num(summary.overdue);
+        $("openTasks").textContent = `${num(summary.open)} открыто`;
+        $("withoutFiles").textContent = num(summary.withoutFiles);
+        $("onTimeRate").textContent = pct(summary.onTimeRate);
+        $("openTasksMini").textContent = num(summary.open);
+        $("periodLabel").textContent = $("range").selectedOptions[0].textContent;
+        $("peopleCount").textContent = `${num((data.people || []).length)} сотрудников`;
+        $("recentCount").textContent = `${num((data.tasks || []).length)} задач`;
+
+        $("peopleRows").innerHTML = (data.people || []).map((item) => `
+          <tr>
+            <td><strong>${esc(item.name)}</strong><span>ID ${esc(item.id)}</span></td>
+            <td>${num(item.total)}</td>
+            <td>${num(item.closed)}</td>
+            <td>${num(item.open)}</td>
+            <td>${num(item.withFiles)} / ${num(item.withoutFiles)}</td>
+            <td><span class="badge ${item.overdue ? "error" : "ok"}">${num(item.overdue)}</span></td>
+            <td><strong>${pct(item.closeRate)}</strong><span>вовремя ${pct(item.onTimeRate)}</span></td>
+          </tr>
+        `).join("") || `<tr><td colspan="7">За период задач нет.</td></tr>`;
+
+        $("taskRows").innerHTML = (data.tasks || []).map((task) => `
+          <tr>
+            <td>${esc(task.id)}</td>
+            <td><strong><a href="${esc(task.url)}" target="_blank" rel="noopener">${esc(task.title)}</a></strong><span>Поставил: ${esc(task.creator || "-")}</span></td>
+            <td>${esc(task.responsible)}</td>
+            <td><span class="badge ${badge(task)}">${esc(task.status)}</span></td>
+            <td>${dt(task.createdDate)}</td>
+            <td><span class="badge ${task.overdue ? "error" : ""}">${dt(task.deadline)}</span></td>
+            <td>${dt(task.closedDate)}</td>
+            <td>${esc(task.closedBy || "-")}</td>
+            <td>${task.durationHours == null ? "-" : `${num(task.durationHours)} ч`}</td>
+            <td><span class="badge ${task.hasFiles ? "ok" : "warn"}">${task.hasFiles ? "Есть" : "Нет"}</span></td>
+          </tr>
+        `).join("") || `<tr><td colspan="10">Нет задач для отображения.</td></tr>`;
+
+        renderBars((data.people || []).slice().sort((a, b) => b.withoutFiles - a.withoutFiles));
+      }
+
+      async function load() {
+        if (loading) return;
+        loading = true;
+        const button = $("refresh");
+        button.disabled = true;
+        button.textContent = "Обновляю";
+        try {
+          const response = await fetch(`${apiBase}/api/tasks-dashboard?range=${encodeURIComponent($("range").value)}`, { credentials: "omit" });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const payload = await response.json();
+          latestPayload = payload;
+          render(payload);
+        } catch (error) {
+          $("healthText").textContent = "Ошибка загрузки";
+          $("updatedAt").textContent = error.message;
+        } finally {
+          loading = false;
+          button.disabled = false;
+          button.textContent = "Обновить";
+        }
+      }
+
+      $("refresh").addEventListener("click", load);
+      $("range").addEventListener("change", load);
+      load();
+      setInterval(load, 30_000);
+    </script>
+  </body>
+</html>
