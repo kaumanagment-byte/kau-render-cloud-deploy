@@ -264,52 +264,64 @@ async function fetchStageDictionary(categoryMap = new Map()) {
   return map;
 }
 
-async function fetchDealsViaItemList(select) {
+async function fetchDealsViaItemList(select, categoryIds = []) {
   const deals = [];
-  let start = 0;
-  while (deals.length < DEAL_LIMIT) {
-    const payload = await bitrix("crm.item.list", {
-      entityTypeId: 2,
-      filter: INCLUDED_CATEGORY_IDS.length ? { "@categoryId": INCLUDED_CATEGORY_IDS.map((id) => Number(id)) } : {},
-      select,
-      start,
-    });
-    const rows = Array.isArray(payload.result?.items) ? payload.result.items : Array.isArray(payload.items) ? payload.items : [];
-    if (!rows.length) break;
-    deals.push(...rows);
-    const next = payload.result?.next ?? payload.next;
-    if (typeof next !== "number") break;
-    start = next;
+  const ids = categoryIds.length ? categoryIds : [WARM_CATEGORY_ID];
+
+  for (const categoryId of ids) {
+    let start = 0;
+    while (deals.length < DEAL_LIMIT) {
+      const payload = await bitrix("crm.item.list", {
+        entityTypeId: 2,
+        filter: { categoryId: Number(categoryId) },
+        select,
+        start,
+      });
+      const rows = Array.isArray(payload.result?.items) ? payload.result.items : Array.isArray(payload.items) ? payload.items : [];
+      if (!rows.length) break;
+      deals.push(...rows);
+      const next = payload.result?.next ?? payload.next;
+      if (typeof next !== "number") break;
+      start = next;
+    }
+    if (deals.length >= DEAL_LIMIT) break;
   }
-  return deals.slice(0, DEAL_LIMIT);
+
+  return [...new Map(deals.map((deal) => [String(firstNonEmpty(deal.ID, deal.id)), deal])).values()].slice(0, DEAL_LIMIT);
 }
 
-async function fetchDealsViaDealList(select) {
+async function fetchDealsViaDealList(select, categoryIds = []) {
   const deals = [];
-  let start = 0;
-  while (deals.length < DEAL_LIMIT) {
-    const payload = await bitrix("crm.deal.list", {
-      order: { ID: "ASC" },
-      filter: INCLUDED_CATEGORY_IDS.length ? { "@CATEGORY_ID": INCLUDED_CATEGORY_IDS.map((id) => Number(id)) } : {},
-      select,
-      start,
-    });
-    const rows = Array.isArray(payload.result) ? payload.result : [];
-    if (!rows.length) break;
-    deals.push(...rows);
-    if (typeof payload.next !== "number") break;
-    start = payload.next;
+  const ids = categoryIds.length ? categoryIds : [WARM_CATEGORY_ID];
+
+  for (const categoryId of ids) {
+    let start = 0;
+    while (deals.length < DEAL_LIMIT) {
+      const payload = await bitrix("crm.deal.list", {
+        order: { ID: "DESC" },
+        filter: { "=CATEGORY_ID": Number(categoryId) },
+        select,
+        start,
+      });
+      const rows = Array.isArray(payload.result) ? payload.result : [];
+      if (!rows.length) break;
+      deals.push(...rows);
+      if (typeof payload.next !== "number") break;
+      start = payload.next;
+    }
+    if (deals.length >= DEAL_LIMIT) break;
   }
-  return deals.slice(0, DEAL_LIMIT);
+
+  return [...new Map(deals.map((deal) => [String(firstNonEmpty(deal.ID, deal.id)), deal])).values()].slice(0, DEAL_LIMIT);
 }
 
-async function fetchDeals() {
+async function fetchDeals(categoryIds = []) {
   const select = [...new Set([...STANDARD_FIELDS, ...getEnvFields()])];
   try {
-    const deals = await fetchDealsViaItemList(select);
+    const deals = await fetchDealsViaItemList(select, categoryIds);
     if (deals.length) return { deals: deals.map(normalizeDealRecord), method: "crm.item.list" };
   } catch {}
-  const deals = await fetchDealsViaDealList(select);
+  const deals = await fetchDealsViaDealList(select, categoryIds);
   return { deals: deals.map(normalizeDealRecord), method: "crm.deal.list" };
 }
 
@@ -784,7 +796,8 @@ function writeSnapshot(entry) {
 async function buildForecast() {
   const categoryMap = await fetchDealCategories();
   const stageDict = await fetchStageDictionary(categoryMap);
-  const { deals: rawDeals, method } = await fetchDeals();
+  const categoryIds = INCLUDED_CATEGORY_IDS.length ? INCLUDED_CATEGORY_IDS : [...categoryMap.keys()];
+  const { deals: rawDeals, method } = await fetchDeals(categoryIds);
   const managerNames = await fetchUsers(rawDeals.map((deal) => deal.ASSIGNED_BY_ID));
   const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
   const { rows: historyRows, mode: historyMode } = await fetchStageHistory();
@@ -838,7 +851,7 @@ async function buildForecast() {
     source: "Bitrix24 CRM",
     fetchMethod: method,
     categoryId: WARM_CATEGORY_ID,
-    includedCategoryIds: INCLUDED_CATEGORY_IDS.length ? INCLUDED_CATEGORY_IDS : [...categoryMap.keys()],
+    includedCategoryIds: categoryIds,
     categories: [...categoryMap.entries()].map(([id, name]) => ({ id, name })),
     targetDate: TARGET_DATE,
     fetchedAt: new Date().toISOString(),
