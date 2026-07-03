@@ -3,9 +3,10 @@ const WARM_CATEGORY_ID = String(process.env.ENROLLMENT_WARM_CATEGORY_ID || "65")
 const TARGET_DATE = process.env.ENROLLMENT_TARGET_DATE || "2026-08-25";
 const PROGRAM_FIELD = process.env.ENROLLMENT_PROGRAM_FIELD || "";
 const LANG_FIELD = process.env.ENROLLMENT_LANG_FIELD || "";
+
 const CACHE_SECONDS = Number(process.env.ENROLLMENT_FORECAST_CACHE_SECONDS || 180);
-const MAX_DEALS = Number(process.env.ENROLLMENT_FORECAST_MAX_DEALS || 5000);
-const BITRIX_TIMEOUT_MS = Number(process.env.BITRIX_TIMEOUT_MS || 25000);
+const SAMPLE_LIMIT = Number(process.env.ENROLLMENT_FORECAST_SAMPLE_LIMIT || 500);
+const BITRIX_TIMEOUT_MS = Number(process.env.BITRIX_TIMEOUT_MS || 8000);
 
 const PROGRAM_PLANS = [
   { program: "Международные отношения", plan: 130, kaz: 80, rus: 40, eng: 10 },
@@ -24,55 +25,54 @@ const PROGRAM_PLANS = [
   { program: "Финансовые технологии", plan: 34, kaz: 12, rus: 12, eng: 10 },
 ];
 
-const TOTAL_PLAN = PROGRAM_PLANS.reduce((sum, item) => sum + item.plan, 0);
+const TOTAL_PLAN = PROGRAM_PLANS.reduce((sum, row) => sum + row.plan, 0);
 
-const STAGE_LABELS = {
-  [`C${WARM_CATEGORY_ID}:NEW`]: "Заявка получена",
-  [`C${WARM_CATEGORY_ID}:PREPARATION`]: "Недозвон",
-  [`C${WARM_CATEGORY_ID}:UC_MM3IOI`]: "Недозвон 2 раз",
-  [`C${WARM_CATEGORY_ID}:UC_B4XOIT`]: "Консультация",
-  [`C${WARM_CATEGORY_ID}:PREPAYMENT_INVOIC`]: "Школьник 10 класс",
-  [`C${WARM_CATEGORY_ID}:EXECUTING`]: "Заинтересован",
-  [`C${WARM_CATEGORY_ID}:UC_9TMMPO`]: "Выбирает другие проф предметы",
-  [`C${WARM_CATEGORY_ID}:UC_M251NP`]: "Выбирает другой ВУЗ",
-  [`C${WARM_CATEGORY_ID}:UC_VE22KW`]: "Не поступает в этом году",
-  [`C${WARM_CATEGORY_ID}:UC_9BJFKR`]: "Пришел на консультацию",
-  [`C${WARM_CATEGORY_ID}:FINAL_INVOICE`]: "Будет подавать документы",
-  [`C${WARM_CATEGORY_ID}:UC_2ZMVBI`]: "Сдал документы",
-  [`C${WARM_CATEGORY_ID}:UC_DP5O3Q`]: "Подписал договор",
-  [`C${WARM_CATEGORY_ID}:UC_76TT8Q`]: "Оплатил за обучение",
-  [`C${WARM_CATEGORY_ID}:WON`]: "Поступил(-а)",
-};
+function stage(code) {
+  return `C${WARM_CATEGORY_ID}:${code}`;
+}
 
-const FACT_STAGES = new Set([
-  `C${WARM_CATEGORY_ID}:UC_2ZMVBI`,
-  `C${WARM_CATEGORY_ID}:UC_DP5O3Q`,
-  `C${WARM_CATEGORY_ID}:UC_76TT8Q`,
-  `C${WARM_CATEGORY_ID}:WON`,
-]);
+const STAGES = [
+  // Верхняя часть воронки / колл-центр
+  { id: stage("NEW"), name: "Заявка получена", group: "Новая база", conservative: 0.03, realistic: 0.08, optimistic: 0.15 },
+  { id: stage("PREPARATION"), name: "Недозвон", group: "Колл-центр", conservative: 0.01, realistic: 0.04, optimistic: 0.08 },
+  { id: stage("UC_MM3IOI"), name: "Недозвон 2 раз", group: "Колл-центр", conservative: 0.005, realistic: 0.02, optimistic: 0.05 },
 
-const STAGE_WEIGHTS = {
-  [`C${WARM_CATEGORY_ID}:WON`]: { conservative: 1, realistic: 1, optimistic: 1 },
-  [`C${WARM_CATEGORY_ID}:UC_76TT8Q`]: { conservative: 1, realistic: 1, optimistic: 1 },
-  [`C${WARM_CATEGORY_ID}:UC_DP5O3Q`]: { conservative: 0.95, realistic: 1, optimistic: 1 },
-  [`C${WARM_CATEGORY_ID}:UC_2ZMVBI`]: { conservative: 0.85, realistic: 0.95, optimistic: 1 },
-  [`C${WARM_CATEGORY_ID}:FINAL_INVOICE`]: { conservative: 0.45, realistic: 0.65, optimistic: 0.8 },
-  [`C${WARM_CATEGORY_ID}:UC_9BJFKR`]: { conservative: 0.3, realistic: 0.5, optimistic: 0.65 },
-  [`C${WARM_CATEGORY_ID}:EXECUTING`]: { conservative: 0.18, realistic: 0.35, optimistic: 0.5 },
-  [`C${WARM_CATEGORY_ID}:UC_B4XOIT`]: { conservative: 0.12, realistic: 0.25, optimistic: 0.4 },
-  [`C${WARM_CATEGORY_ID}:NEW`]: { conservative: 0.03, realistic: 0.08, optimistic: 0.15 },
-  [`C${WARM_CATEGORY_ID}:PREPARATION`]: { conservative: 0.01, realistic: 0.04, optimistic: 0.08 },
-  [`C${WARM_CATEGORY_ID}:UC_MM3IOI`]: { conservative: 0.005, realistic: 0.02, optimistic: 0.05 },
-  [`C${WARM_CATEGORY_ID}:PREPAYMENT_INVOIC`]: { conservative: 0.02, realistic: 0.05, optimistic: 0.1 },
-};
+  // Теплая обработка
+  { id: stage("UC_B4XOIT"), name: "Консультация", group: "Теплая база", conservative: 0.12, realistic: 0.25, optimistic: 0.4 },
+  { id: stage("UC_9BJFKR"), name: "Пришел на консультацию", group: "Теплая база", conservative: 0.35, realistic: 0.55, optimistic: 0.75 },
+  { id: stage("EXECUTING"), name: "Заинтересован", group: "Теплая база", conservative: 0.22, realistic: 0.4, optimistic: 0.58 },
+  { id: stage("FINAL_INVOICE"), name: "Будет подавать документы", group: "Горячая база", conservative: 0.55, realistic: 0.72, optimistic: 0.88 },
 
-const NEGATIVE_STAGES = new Set([
-  `C${WARM_CATEGORY_ID}:UC_9TMMPO`,
-  `C${WARM_CATEGORY_ID}:UC_M251NP`,
-  `C${WARM_CATEGORY_ID}:UC_VE22KW`,
-]);
+  // Уже близко к факту / факт
+  { id: stage("UC_2ZMVBI"), name: "Сдал документы", group: "Факт", fact: true, conservative: 1, realistic: 1, optimistic: 1 },
+  { id: stage("UC_DP5O3Q"), name: "Подписал договор", group: "Факт", fact: true, conservative: 1, realistic: 1, optimistic: 1 },
+  { id: stage("UC_76TT8Q"), name: "Оплатил за обучение", group: "Факт", fact: true, conservative: 1, realistic: 1, optimistic: 1 },
+  { id: stage("WON"), name: "Поступил(-а)", group: "Факт", fact: true, conservative: 1, realistic: 1, optimistic: 1 },
+
+  // Не включаем в прогноз набора, но показываем в воронке
+  { id: stage("PREPAYMENT_INVOIC"), name: "Школьник 10 класс", group: "Отложено", conservative: 0.02, realistic: 0.05, optimistic: 0.1 },
+  { id: stage("UC_9TMMPO"), name: "Выбирает другие проф предметы", group: "Риск / не берем", negative: true, conservative: 0, realistic: 0, optimistic: 0 },
+  { id: stage("UC_M251NP"), name: "Выбирает другой ВУЗ", group: "Риск / не берем", negative: true, conservative: 0, realistic: 0, optimistic: 0 },
+  { id: stage("UC_VE22KW"), name: "Не поступает в этом году", group: "Риск / не берем", negative: true, conservative: 0, realistic: 0, optimistic: 0 },
+  { id: stage("LOSE"), name: "Проиграна / отказ", group: "Риск / не берем", negative: true, conservative: 0, realistic: 0, optimistic: 0 },
+
+  // Эти коды были в CRM, но без понятного названия. Пока считаем их нейтрально.
+  { id: stage("1"), name: "Статус C65:1", group: "Не размечено", conservative: 0, realistic: 0, optimistic: 0 },
+  { id: stage("2"), name: "Статус C65:2", group: "Не размечено", conservative: 0, realistic: 0, optimistic: 0 },
+  { id: stage("3"), name: "Статус C65:3", group: "Не размечено", conservative: 0, realistic: 0, optimistic: 0 },
+];
 
 let cache = null;
+
+function pct(part, whole) {
+  if (!whole) return 0;
+  return Math.round((Number(part || 0) / Number(whole || 0)) * 1000) / 10;
+}
+
+function daysLeft() {
+  const target = new Date(`${TARGET_DATE}T23:59:59+05:00`);
+  return Math.max(1, Math.ceil((target.getTime() - Date.now()) / 86400000));
+}
 
 function normalize(value) {
   return String(value || "")
@@ -90,21 +90,19 @@ function rawFieldValue(value) {
 
 function detectProgram(deal) {
   const direct = rawFieldValue(PROGRAM_FIELD ? deal[PROGRAM_FIELD] : "");
-  const haystack = normalize([direct, deal.TITLE, deal.OPPORTUNITY, deal.SOURCE_DESCRIPTION].filter(Boolean).join(" "));
+  const haystack = normalize([direct, deal.TITLE, deal.SOURCE_DESCRIPTION].filter(Boolean).join(" "));
   if (!haystack) return "Не указано";
-
   for (const row of PROGRAM_PLANS) {
-    const name = normalize(row.program);
-    const shortName = name.replace("международный бизнес и предпринимательство", "мб и предпринимательство");
-    if (haystack.includes(name) || haystack.includes(shortName)) return row.program;
+    const full = normalize(row.program);
+    if (haystack.includes(full)) return row.program;
   }
-
   if (haystack.includes("мб") && haystack.includes("предприним")) return "Международный бизнес и предпринимательство";
-  if (haystack.includes("журналист")) return "Журналистика";
+  if (haystack.includes("международ") && haystack.includes("отнош")) return "Международные отношения";
+  if (haystack.includes("перевод")) return "Переводческое дело";
   if (haystack.includes("туризм")) return "Туризм";
+  if (haystack.includes("журналист")) return "Журналистика";
   if (haystack.includes("юрис")) return "Юриспруденция";
   if (haystack.includes("финанс")) return "Финансы";
-  if (haystack.includes("перевод")) return "Переводческое дело";
   return "Не указано";
 }
 
@@ -115,17 +113,6 @@ function detectLang(deal) {
   if (haystack.includes("рус") || haystack.includes("rus")) return "rus";
   if (haystack.includes("каз") || haystack.includes("kaz")) return "kaz";
   return "unknown";
-}
-
-function pct(part, whole) {
-  if (!whole) return 0;
-  return Math.round((Number(part || 0) / Number(whole || 0)) * 1000) / 10;
-}
-
-function daysLeft() {
-  const target = new Date(`${TARGET_DATE}T23:59:59+05:00`);
-  const diff = target.getTime() - Date.now();
-  return Math.max(1, Math.ceil(diff / 86400000));
 }
 
 async function bitrix(method, params = {}) {
@@ -143,9 +130,7 @@ async function bitrix(method, params = {}) {
     let payload = {};
     try { payload = text ? JSON.parse(text) : {}; }
     catch { payload = { raw: text }; }
-    if (!response.ok || payload.error) {
-      throw new Error(payload.error_description || payload.error || `Bitrix HTTP ${response.status}`);
-    }
+    if (!response.ok || payload.error) throw new Error(payload.error_description || payload.error || `Bitrix HTTP ${response.status}`);
     return payload;
   } catch (error) {
     if (error.name === "AbortError") throw new Error(`Bitrix timeout after ${BITRIX_TIMEOUT_MS}ms`);
@@ -155,18 +140,28 @@ async function bitrix(method, params = {}) {
   }
 }
 
-async function fetchAllDeals() {
-  const select = [
-    "ID",
-    "TITLE",
-    "CATEGORY_ID",
-    "STAGE_ID",
-    "ASSIGNED_BY_ID",
-    "SOURCE_ID",
-    "SOURCE_DESCRIPTION",
-    "DATE_CREATE",
-    "DATE_MODIFY",
-  ];
+async function countDeals(filter) {
+  const payload = await bitrix("crm.deal.list", {
+    order: { ID: "DESC" },
+    filter,
+    select: ["ID"],
+    start: 0,
+  });
+  if (typeof payload.total === "number") return payload.total;
+  return Array.isArray(payload.result) ? payload.result.length : 0;
+}
+
+async function fetchStageCounts() {
+  const rows = [];
+  for (const item of STAGES) {
+    const count = await countDeals({ "=CATEGORY_ID": Number(WARM_CATEGORY_ID), "=STAGE_ID": item.id });
+    rows.push({ ...item, count });
+  }
+  return rows;
+}
+
+async function fetchSampleDeals() {
+  const select = ["ID", "TITLE", "STAGE_ID", "ASSIGNED_BY_ID", "SOURCE_ID", "SOURCE_DESCRIPTION"];
   if (PROGRAM_FIELD) select.push(PROGRAM_FIELD);
   if (LANG_FIELD) select.push(LANG_FIELD);
 
@@ -182,26 +177,8 @@ async function fetchAllDeals() {
     const batch = Array.isArray(payload.result) ? payload.result : [];
     deals.push(...batch);
     start = typeof payload.next === "number" ? payload.next : null;
-  } while (start !== null && deals.length < MAX_DEALS);
-  return deals;
-}
-
-async function fetchUsers(ids) {
-  const unique = [...new Set(ids.filter(Boolean).map(String))];
-  const users = new Map();
-  for (let i = 0; i < unique.length; i += 50) {
-    const chunk = unique.slice(i, i + 50);
-    try {
-      const payload = await bitrix("user.get", { ID: chunk });
-      for (const user of payload.result || []) {
-        const name = [user.NAME, user.LAST_NAME].filter(Boolean).join(" ").trim() || `ID ${user.ID}`;
-        users.set(String(user.ID), name);
-      }
-    } catch {
-      chunk.forEach((id) => users.set(String(id), `ID ${id}`));
-    }
-  }
-  return users;
+  } while (start !== null && deals.length < SAMPLE_LIMIT);
+  return deals.slice(0, SAMPLE_LIMIT);
 }
 
 function add(map, key, amount = 1) {
@@ -209,32 +186,36 @@ function add(map, key, amount = 1) {
   map.set(safeKey, Number(map.get(safeKey) || 0) + amount);
 }
 
-function scenarioValue(deals, scenario) {
-  return Math.round(
-    deals.reduce((sum, deal) => {
-      if (NEGATIVE_STAGES.has(deal.STAGE_ID)) return sum;
-      const weights = STAGE_WEIGHTS[deal.STAGE_ID] || { conservative: 0, realistic: 0, optimistic: 0 };
-      return sum + Number(weights[scenario] || 0);
-    }, 0)
-  );
+function scenarioFromStages(stageRows, scenario) {
+  return Math.round(stageRows.reduce((sum, row) => sum + Number(row.count || 0) * Number(row[scenario] || 0), 0));
 }
 
-function buildProgramRows(deals) {
+function buildGroups(stageRows) {
+  const map = new Map();
+  for (const row of stageRows) {
+    const current = map.get(row.group) || { name: row.group, count: 0, realistic: 0 };
+    current.count += Number(row.count || 0);
+    current.realistic += Number(row.count || 0) * Number(row.realistic || 0);
+    map.set(row.group, current);
+  }
+  return [...map.values()].map((row) => ({ ...row, realistic: Math.round(row.realistic) }));
+}
+
+function buildProgramRows(sampleDeals) {
   const byProgram = new Map(PROGRAM_PLANS.map((row) => [row.program, { ...row, actual: 0, conservative: 0, realistic: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } }]));
   const unknown = { program: "Не указано в CRM", plan: 0, kaz: 0, rus: 0, eng: 0, actual: 0, conservative: 0, realistic: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } };
 
-  for (const deal of deals) {
+  const stageMap = new Map(STAGES.map((row) => [row.id, row]));
+  for (const deal of sampleDeals) {
     const program = detectProgram(deal);
     const row = byProgram.get(program) || unknown;
+    const stageRow = stageMap.get(deal.STAGE_ID) || {};
     const lang = detectLang(deal);
     row.langs[lang] = Number(row.langs[lang] || 0) + 1;
-    if (FACT_STAGES.has(deal.STAGE_ID)) row.actual += 1;
-    if (!NEGATIVE_STAGES.has(deal.STAGE_ID)) {
-      const weights = STAGE_WEIGHTS[deal.STAGE_ID] || {};
-      row.conservative += Number(weights.conservative || 0);
-      row.realistic += Number(weights.realistic || 0);
-      row.optimistic += Number(weights.optimistic || 0);
-    }
+    if (stageRow.fact) row.actual += 1;
+    row.conservative += Number(stageRow.conservative || 0);
+    row.realistic += Number(stageRow.realistic || 0);
+    row.optimistic += Number(stageRow.optimistic || 0);
   }
 
   const rows = [...byProgram.values()];
@@ -249,32 +230,43 @@ function buildProgramRows(deals) {
   }));
 }
 
-async function buildForecast() {
-  const deals = await fetchAllDeals();
-
-  const activeDeals = deals.filter((deal) => !NEGATIVE_STAGES.has(deal.STAGE_ID));
-  const factDeals = deals.filter((deal) => FACT_STAGES.has(deal.STAGE_ID));
-  const stageMap = new Map();
+function buildSampleBreakdowns(sampleDeals) {
   const sourceMap = new Map();
   const managerMap = new Map();
+  const stageMap = new Map(STAGES.map((row) => [row.id, row]));
 
-  for (const deal of deals) {
-    add(stageMap, STAGE_LABELS[deal.STAGE_ID] || deal.STAGE_ID);
+  for (const deal of sampleDeals) {
     add(sourceMap, deal.SOURCE_DESCRIPTION || deal.SOURCE_ID || "Не указан");
+    const stageRow = stageMap.get(deal.STAGE_ID) || {};
     const managerName = `ID ${deal.ASSIGNED_BY_ID || "?"}`;
     const current = managerMap.get(managerName) || { name: managerName, total: 0, fact: 0, realistic: 0 };
     current.total += 1;
-    if (FACT_STAGES.has(deal.STAGE_ID)) current.fact += 1;
-    current.realistic += Number((STAGE_WEIGHTS[deal.STAGE_ID] || {}).realistic || 0);
+    if (stageRow.fact) current.fact += 1;
+    current.realistic += Number(stageRow.realistic || 0);
     managerMap.set(managerName, current);
   }
 
-  const conservative = Math.min(TOTAL_PLAN, scenarioValue(deals, "conservative"));
-  const realistic = Math.min(TOTAL_PLAN, scenarioValue(deals, "realistic"));
-  const optimistic = Math.min(TOTAL_PLAN, scenarioValue(deals, "optimistic"));
-  const actual = factDeals.length;
+  return {
+    bySource: [...sourceMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 20),
+    consultants: [...managerMap.values()].map((item) => ({ ...item, realistic: Math.round(item.realistic) })).sort((a, b) => b.realistic - a.realistic).slice(0, 30),
+  };
+}
+
+async function buildForecast() {
+  const stageRows = await fetchStageCounts();
+  const sampleDeals = await fetchSampleDeals().catch(() => []);
+  const sample = buildSampleBreakdowns(sampleDeals);
+
+  const actual = stageRows.filter((row) => row.fact).reduce((sum, row) => sum + Number(row.count || 0), 0);
+  const allWarmDeals = await countDeals({ "=CATEGORY_ID": Number(WARM_CATEGORY_ID) }).catch(() => stageRows.reduce((sum, row) => sum + Number(row.count || 0), 0));
+  const riskDeals = stageRows.filter((row) => row.negative).reduce((sum, row) => sum + Number(row.count || 0), 0);
+  const activeDeals = Math.max(0, allWarmDeals - riskDeals);
   const left = Math.max(0, TOTAL_PLAN - actual);
   const leftDays = daysLeft();
+
+  const conservative = Math.min(TOTAL_PLAN, scenarioFromStages(stageRows, "conservative"));
+  const realistic = Math.min(TOTAL_PLAN, scenarioFromStages(stageRows, "realistic"));
+  const optimistic = Math.min(TOTAL_PLAN, scenarioFromStages(stageRows, "optimistic"));
 
   return {
     ok: true,
@@ -283,42 +275,58 @@ async function buildForecast() {
     targetDate: TARGET_DATE,
     fetchedAt: new Date().toISOString(),
     rules: {
-      factStages: [...FACT_STAGES].map((id) => ({ id, name: STAGE_LABELS[id] || id })),
-      note: "Факт берется из теплой базы: Сдал документы и все следующие стадии.",
+      note: "Факт считается точным count-запросом по стадиям теплой базы. Прогноз строится по всем ключевым статусам, а не по ограниченному срезу сделок.",
+      factStages: stageRows.filter((row) => row.fact).map((row) => ({ id: row.id, name: row.name, count: row.count })),
+      forecastStages: stageRows.filter((row) => !row.negative && Number(row.realistic || 0) > 0).map((row) => ({
+        id: row.id,
+        name: row.name,
+        count: row.count,
+        conservativeWeight: row.conservative,
+        realisticWeight: row.realistic,
+        optimisticWeight: row.optimistic,
+      })),
     },
     summary: {
       plan: TOTAL_PLAN,
       actual,
       remaining: left,
       progress: pct(actual, TOTAL_PLAN),
-      activeDeals: activeDeals.length,
-      allWarmDeals: deals.length,
+      activeDeals,
+      allWarmDeals,
+      riskDeals,
       daysLeft: leftDays,
       requiredDailyPace: Math.round((left / leftDays) * 10) / 10,
+      sampleDeals: sampleDeals.length,
     },
     scenarios: {
       conservative: { label: "Осторожный", value: conservative, progress: pct(conservative, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - conservative) },
       realistic: { label: "Реалистичный", value: realistic, progress: pct(realistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - realistic) },
       optimistic: { label: "Оптимистичный", value: optimistic, progress: pct(optimistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - optimistic) },
     },
-    byProgram: buildProgramRows(deals),
-    byStage: [...stageMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
-    bySource: [...sourceMap.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 20),
-    consultants: [...managerMap.values()].map((item) => ({ ...item, realistic: Math.round(item.realistic) })).sort((a, b) => b.realistic - a.realistic).slice(0, 30),
+    forecastGroups: buildGroups(stageRows),
+    byStage: stageRows.filter((row) => Number(row.count || 0) > 0).map((row) => ({
+      name: row.name,
+      id: row.id,
+      group: row.group,
+      count: row.count,
+      realisticImpact: Math.round(Number(row.count || 0) * Number(row.realistic || 0)),
+    })).sort((a, b) => b.count - a.count),
+    byProgram: buildProgramRows(sampleDeals),
+    bySource: sample.bySource,
+    consultants: sample.consultants,
     fields: {
       programField: PROGRAM_FIELD || null,
       languageField: LANG_FIELD || null,
       programSplitReady: Boolean(PROGRAM_FIELD),
       languageSplitReady: Boolean(LANG_FIELD),
+      sourceAndManagerMode: "sample",
     },
   };
 }
 
 async function enrollmentForecast() {
   const now = Date.now();
-  if (cache && now - cache.createdAt < CACHE_SECONDS * 1000) {
-    return { ...cache.payload, cache: "fresh" };
-  }
+  if (cache && now - cache.createdAt < CACHE_SECONDS * 1000) return { ...cache.payload, cache: "fresh" };
   const payload = await buildForecast();
   cache = { createdAt: Date.now(), payload };
   return { ...payload, cache: "updated" };
