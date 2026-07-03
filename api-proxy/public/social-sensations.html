@@ -5,24 +5,81 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>KAU AI Content Radar</title>
   <style>
-    :root{--bg:#f3f1ea;--panel:#fffdf8;--text:#1f1a17;--muted:#6f665f;--line:#e3ddd4;--brand:#ae4f2b;--brand-dark:#7d361c;--sage:#627a59;--ink:#222630;--soft:#f7f2ea;--shadow:0 12px 30px rgba(74,48,26,.08)}
-    *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#f5efe7,#f1eee7);color:var(--text);font:14px/1.5 "Segoe UI",Arial,sans-serif}.shell{min-height:100vh;display:grid;grid-template-columns:220px minmax(0,1fr)}
-    aside{position:sticky;top:0;height:100vh;padding:18px 12px;background:rgba(255,253,248,.92);backdrop-filter:blur(14px);border-right:1px solid var(--line);display:flex;flex-direction:column}.brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}.mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;display:grid;place-items:center;font-weight:800}.brand span{display:block;font-size:12px;color:var(--muted)}
-    nav{display:grid;gap:4px}nav a{text-decoration:none;padding:10px;border-radius:10px;color:#615951}nav a:hover,nav a.active{background:#efe6da;color:#1d1714;font-weight:700}.status{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}.status strong,.status small{display:block}.status small{color:var(--muted)}
-    main{padding:20px;min-width:0}.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:26px;background:radial-gradient(circle at top right,#f8dccb 0,#fffdf8 40%,#fffdf8 100%);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);margin-bottom:14px}.eyebrow{text-transform:uppercase;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--brand);margin:0 0 6px}h1{font-size:50px;line-height:1;margin:0;max-width:780px}h2,h3,p{margin:0}.lead{margin-top:10px;color:#544d46;font-size:16px;max-width:900px}.refresh{height:42px;border:0;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;padding:0 18px;font-weight:750;cursor:pointer}
-    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.metric,.panel,.opp{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.metric{padding:16px}.metric span,.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:30px;margin:4px 0}
-    .layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:12px}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.panel-body{padding:16px 18px}.badge{display:inline-flex;padding:5px 9px;border-radius:999px;background:#efe6da;color:var(--brand-dark);font-size:12px;font-weight:700}
-    .source-list,.opps,.platform-list{display:grid;gap:10px}.source,.mini,.platform-card{padding:12px;border-radius:12px;background:var(--soft)}.source strong,.mini strong,.platform-card strong{display:block}.source a{color:var(--brand-dark)}.muted{color:var(--muted)}
-    .opps{gap:14px}.opp{padding:18px}.opp-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.opp h3{font-size:28px;margin-bottom:6px}.opp .summary{color:#4b433c}.platform-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.platform-card{height:100%}.platform-card h4{margin:0 0 8px;font-size:16px}.idea{padding:10px 0;border-top:1px solid rgba(0,0,0,.06)}.idea:first-child{border-top:0;padding-top:0}.idea p{margin-top:4px}.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.tag{padding:4px 7px;border-radius:999px;background:#fff;border:1px solid #eadfce;font-size:12px;color:#594f46}
-    .release{margin-top:14px}.release-body{white-space:pre-wrap;color:#322c27;line-height:1.65}.empty{padding:24px;color:var(--muted);text-align:center}
-    @media(max-width:1180px){.platform-grid,.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}.shell{grid-template-columns:1fr}aside{position:static;height:auto}.status{display:none}}@media(max-width:720px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:36px}.metrics,.platform-grid{grid-template-columns:1fr}}
+    :root{--bg:#f3f1ea;--panel:#fffdf8;--text:#1f1a17;--muted:#6f665f;--line:#e3ddd4;--brand:#ae4f2b;--brand-dark:#7d361c;--soft:#f7f2ea;--shadow:0 12px 30px rgba(74,48,26,.08)}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:linear-gradient(180deg,#f5efe7,#f1eee7);color:var(--text);font:14px/1.55 "Segoe UI",Arial,sans-serif}
+    body{overflow-x:hidden}
+    .shell{min-height:100vh;display:grid;grid-template-columns:220px minmax(0,1fr)}
+    aside.side{position:sticky;top:0;height:100vh;padding:18px 12px;background:rgba(255,253,248,.92);backdrop-filter:blur(14px);border-right:1px solid var(--line);display:flex;flex-direction:column}
+    .brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}
+    .mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;display:grid;place-items:center;font-weight:800}
+    .brand span{display:block;font-size:12px;color:var(--muted)}
+    nav{display:grid;gap:4px}
+    nav a{text-decoration:none;padding:10px;border-radius:10px;color:#615951}
+    nav a:hover,nav a.active{background:#efe6da;color:#1d1714;font-weight:700}
+    .status{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+    .status strong,.status small{display:block}
+    .status small{color:var(--muted)}
+    main{padding:20px;min-width:0}
+    .hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:28px;background:radial-gradient(circle at top right,#f8dccb 0,#fffdf8 40%,#fffdf8 100%);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);margin-bottom:14px}
+    .eyebrow{text-transform:uppercase;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--brand);margin:0 0 6px}
+    h1{font-size:48px;line-height:1.04;margin:0;max-width:860px}
+    h2,h3,h4,p{margin:0}
+    .lead{margin-top:10px;color:#544d46;font-size:16px;max-width:980px}
+    .refresh{height:42px;border:0;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;padding:0 18px;font-weight:750;cursor:pointer;flex:0 0 auto}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    .metric,.panel,.opp{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+    .metric{padding:16px;min-width:0}
+    .metric span,.metric small{display:block;color:var(--muted)}
+    .metric strong{display:block;font-size:26px;margin:4px 0;overflow-wrap:anywhere}
+    .context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .panel-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .panel-body{padding:16px 18px}
+    .badge{display:inline-flex;padding:5px 9px;border-radius:999px;background:#efe6da;color:var(--brand-dark);font-size:12px;font-weight:700;max-width:100%;overflow-wrap:anywhere}
+    .source-list,.source-stack,.opps,.platform-list{display:grid;gap:10px}
+    .source,.mini,.platform-card,.fact-card{padding:12px;border-radius:12px;background:var(--soft);min-width:0}
+    .source strong,.mini strong,.platform-card strong,.fact-card strong{display:block}
+    .source a{color:var(--brand-dark);word-break:break-word}
+    .muted{color:var(--muted)}
+    .source-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .opps{gap:14px}
+    .opp{padding:18px;min-width:0}
+    .opp-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}
+    .opp h3{font-size:30px;line-height:1.15;margin-bottom:8px;overflow-wrap:anywhere}
+    .opp .summary{color:#4b433c;font-size:15px}
+    .fact-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+    .fact-card span{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}
+    .fact-card p{overflow-wrap:anywhere}
+    .platform-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+    .platform-card{height:100%;min-width:0}
+    .platform-card h4{margin:0 0 8px;font-size:16px}
+    .idea{padding:10px 0;border-top:1px solid rgba(0,0,0,.06);min-width:0}
+    .idea:first-child{border-top:0;padding-top:0}
+    .idea p{margin-top:4px;overflow-wrap:anywhere}
+    .sample{white-space:pre-wrap}
+    .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .tag{padding:4px 7px;border-radius:999px;background:#fff;border:1px solid #eadfce;font-size:12px;color:#594f46}
+    .release{margin-top:14px}
+    .release-body{white-space:pre-wrap;color:#322c27;line-height:1.7;overflow-wrap:anywhere}
+    .empty{padding:24px;color:var(--muted);text-align:center}
+    @media(max-width:1320px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.context-grid,.source-row,.fact-grid,.platform-grid{grid-template-columns:1fr}}
+    @media(max-width:1180px){.shell{grid-template-columns:1fr}aside.side{position:static;height:auto}.status{display:none}}
+    @media(max-width:720px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:34px}.metrics{grid-template-columns:1fr}.opp-top{grid-template-columns:1fr}}
   </style>
-  <style>html.embed-mode .shell{grid-template-columns:1fr}html.embed-mode aside{display:none}html.embed-mode main{padding:0}</style>
-  <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed-mode");</script>
+  <style>
+    html.embed-mode .shell{grid-template-columns:1fr}
+    html.embed-mode aside.side{display:none}
+    html.embed-mode main{padding:0}
+  </style>
+  <script>
+    if (new URLSearchParams(location.search).get("embed") === "1") {
+      document.documentElement.classList.add("embed-mode");
+    }
+  </script>
 </head>
 <body>
 <div class="shell">
-  <aside>
+  <aside class="side">
     <div class="brand"><span class="mark">KAU</span><div><strong>Command Center</strong><span>AI content radar</span></div></div>
     <nav>
       <a href="https://kau.kz/marketing/data/bitrex">Общий дашборд</a>
@@ -33,36 +90,54 @@
     </nav>
     <div class="status"><strong id="status">Загрузка</strong><small id="updated">Gemini radar</small></div>
   </aside>
+
   <main>
     <header class="hero">
       <div>
-        <p class="eyebrow">Gemini API · KAU source adaptation</p>
+        <p class="eyebrow">Gemini API · Weekly trend adaptation</p>
         <h1>AI контент-радар для KAU</h1>
-        <p class="lead">Система анализирует актуальные страницы `kau.edu.kz`, внешние трендовые сигналы и собирает адаптированные идеи для Instagram, TikTok, LinkedIn и PR-материалов под бренд KAU.</p>
+        <p class="lead">Система берет тренды из сети за последнюю неделю, изучает страницы KAU, его программы, позиционирование и новости, а затем превращает внешние инфоповоды в адаптированные идеи для Instagram, TikTok, LinkedIn и пресс-релизов.</p>
       </div>
       <button class="refresh" id="refresh">Обновить</button>
     </header>
 
     <section class="metrics">
-      <article class="metric"><span>Инфоповоды</span><strong id="oppCount">-</strong><small>главных тем для контента и PR</small></article>
+      <article class="metric"><span>Инфоповоды</span><strong id="oppCount">-</strong><small>главных идей для контента и PR</small></article>
       <article class="metric"><span>Источники KAU</span><strong id="kauCount">-</strong><small>страниц сайта в анализе</small></article>
-      <article class="metric"><span>Тренд-сигналы</span><strong id="trendCount">-</strong><small>внешних интернет-сигналов</small></article>
+      <article class="metric"><span>Тренд-сигналы</span><strong id="trendCount">-</strong><small id="trendWindowLabel">внешних сигналов за 7 дней</small></article>
       <article class="metric"><span>Модель</span><strong id="modelName">-</strong><small>Gemini для генерации стратегии</small></article>
     </section>
 
-    <section class="layout">
-      <aside class="panel">
-        <div class="panel-head"><div><p class="eyebrow">Контекст</p><h2>Что вошло в анализ</h2></div><span class="badge" id="cacheState">-</span></div>
+    <section class="context-grid">
+      <section class="panel">
+        <div class="panel-head">
+          <div><p class="eyebrow">Контекст KAU</p><h2>Что поняла система</h2></div>
+          <span class="badge" id="cacheState">-</span>
+        </div>
         <div class="panel-body source-list">
           <div class="mini"><strong>Бренд-сводка</strong><p class="muted" id="brandSummary">Загрузка...</p></div>
           <div class="mini"><strong>Стратегический вывод</strong><p class="muted" id="strategicTakeaway">Загрузка...</p></div>
-          <div class="mini"><strong>Страницы KAU</strong><div id="kauSources"></div></div>
-          <div class="mini"><strong>Внешние сигналы</strong><div id="trendSources"></div></div>
         </div>
-      </aside>
+      </section>
 
-      <section class="opps" id="opportunities"><div class="empty">Загрузка инфоповодов...</div></section>
+      <section class="panel">
+        <div class="panel-head">
+          <div><p class="eyebrow">Источники</p><h2>Что вошло в анализ</h2></div>
+        </div>
+        <div class="panel-body source-stack">
+          <div class="mini">
+            <strong>Страницы KAU</strong>
+            <div class="source-row" id="kauSources"></div>
+          </div>
+          <div class="mini">
+            <strong>Внешние тренды</strong>
+            <div class="source-row" id="trendSources"></div>
+          </div>
+        </div>
+      </section>
     </section>
+
+    <section class="opps" id="opportunities"><div class="empty">Загрузка инфоповодов...</div></section>
 
     <section class="panel release">
       <div class="panel-head"><div><p class="eyebrow">PR</p><h2>Пресс-релиз</h2></div></div>
@@ -80,8 +155,21 @@
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
   const apiBase = location.protocol === "file:" ? "https://kau-command-center-api-cloud.onrender.com" : "";
 
+  function formatDate(value) {
+    if (!value) return "дата не указана";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "long" });
+  }
+
   function renderSourceList(items, targetId) {
-    $(targetId).innerHTML = (items || []).map((item) => `<div class="source"><strong>${esc(item.title)}</strong><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">${esc(item.url)}</a></div>`).join("") || `<div class="empty">Нет данных</div>`;
+    $(targetId).innerHTML = (items || []).map((item) => `
+      <div class="source">
+        <strong>${esc(item.title)}</strong>
+        ${item.date ? `<div class="muted" style="margin:4px 0 6px">${esc(formatDate(item.date))}</div>` : ""}
+        <a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">${esc(item.url)}</a>
+      </div>
+    `).join("") || `<div class="empty">Нет данных</div>`;
   }
 
   function renderPlatformIdeas(title, items) {
@@ -93,7 +181,7 @@
             <strong>${esc(idea.format)}</strong>
             <p><b>Посыл:</b> ${esc(idea.message)}</p>
             <p><b>Аудитория:</b> ${esc(idea.audience)}</p>
-            <p><b>Текст:</b> ${esc(idea.sample_post)}</p>
+            <p class="sample"><b>Текст:</b> ${esc(idea.sample_post)}</p>
             <p><b>Визуал:</b> ${esc(idea.visual_notes)}</p>
             <div class="tags">${(idea.hashtags || []).map((tag) => `<span class="tag">${esc(tag)}</span>`).join("")}</div>
           </div>
@@ -107,13 +195,44 @@
       <article class="opp">
         <div class="opp-top">
           <div>
-            <p class="eyebrow">${esc(item.source_title)}</p>
+            <p class="eyebrow">${esc(item.source_title || "Тренд-сигнал")}</p>
             <h3>${esc(item.title)}</h3>
-            <p class="summary">${esc(item.pr_angle)}</p>
+            <p class="summary">${esc(item.pr_angle || "")}</p>
           </div>
           <span class="badge">${esc((item.target_audience || []).join(", "))}</span>
         </div>
-        <p class="muted" style="margin-top:8px">${esc(item.why_it_resonates)}</p>
+
+        <div class="fact-grid">
+          <div class="fact-card">
+            <span>Источник и дата</span>
+            <strong>${esc(item.source_type || "trend")}</strong>
+            <p>${esc(formatDate(item.source_date))}</p>
+          </div>
+          <div class="fact-card">
+            <span>Механика тренда</span>
+            <p>${esc(item.trend_mechanic || "-")}</p>
+          </div>
+          <div class="fact-card">
+            <span>Как адаптировать под KAU</span>
+            <p>${esc(item.kau_adaptation || "-")}</p>
+          </div>
+        </div>
+
+        <div class="fact-grid">
+          <div class="fact-card">
+            <span>Почему сработает</span>
+            <p>${esc(item.why_it_resonates || "-")}</p>
+          </div>
+          <div class="fact-card">
+            <span>Приоритет</span>
+            <strong>${esc(item.priority || "-")}</strong>
+          </div>
+          <div class="fact-card">
+            <span>PR hook</span>
+            <p>${esc(item.press_hook || "-")}</p>
+          </div>
+        </div>
+
         <div class="platform-grid">
           ${renderPlatformIdeas("Instagram", item.instagram)}
           ${renderPlatformIdeas("TikTok", item.tiktok)}
@@ -129,6 +248,7 @@
     $("oppCount").textContent = (data.opportunities || []).length;
     $("kauCount").textContent = (data.rawSources?.kau || []).length;
     $("trendCount").textContent = (data.rawSources?.trends || []).length;
+    $("trendWindowLabel").textContent = `внешних сигналов за ${data.trendWindowDays || 7} дней`;
     $("modelName").textContent = data.model || "-";
     $("cacheState").textContent = data.cache || "updated";
     $("brandSummary").textContent = data.brandSummary || "-";
