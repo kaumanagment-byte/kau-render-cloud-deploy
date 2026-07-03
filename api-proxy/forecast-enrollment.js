@@ -165,6 +165,22 @@ function daysLeft() {
   return Math.max(1, Math.ceil((target.getTime() - Date.now()) / 86400000));
 }
 
+function academicPeriod() {
+  const target = new Date(`${TARGET_DATE}T23:59:59+05:00`);
+  const targetYear = target.getUTCFullYear();
+  const startYear = target.getUTCMonth() >= 8 ? targetYear : targetYear - 1;
+  const start = new Date(Date.UTC(startYear, 8, 1, 0, 0, 0));
+  const end = target;
+  return { start, end };
+}
+
+function isWithinAcademicPeriod(value) {
+  const date = parseDate(value);
+  if (!date) return false;
+  const { start, end } = academicPeriod();
+  return date >= start && date <= end;
+}
+
 function getEnvFields() {
   return [
     PROGRAM_FIELD,
@@ -811,16 +827,25 @@ async function buildForecast() {
   const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
   const { rows: historyRows, mode: historyMode } = await fetchStageHistory();
 
-  const actual = preparedDeals.filter((deal) => deal.stageKey === "submitted").length;
-  const conservative = round1(preparedDeals.reduce((sum, deal) => sum + deal.probability.conservative, 0));
-  const realistic = round1(preparedDeals.reduce((sum, deal) => sum + deal.probability.realistic, 0));
-  const optimistic = round1(preparedDeals.reduce((sum, deal) => sum + deal.probability.optimistic, 0));
-  const activeDeals = preparedDeals.filter((deal) => !deal.flags.negative).length;
-  const riskDeals = preparedDeals.filter((deal) => deal.flags.negative).length;
+  const createdAcademicPeriodDeals = preparedDeals.filter((deal) => isWithinAcademicPeriod(deal.dateCreate));
+  const scenarioDeals = preparedDeals.filter((deal) =>
+    String(deal.categoryId) === WARM_CATEGORY_ID &&
+    !deal.flags.negative &&
+    deal.stageKey !== "unknown"
+  );
+  const factDeals = scenarioDeals.filter((deal) => deal.flags.fact);
+  const workingDeals = scenarioDeals.filter((deal) => !deal.flags.fact);
+
+  const actual = factDeals.length;
+  const conservative = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.conservative, 0));
+  const realistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.realistic, 0));
+  const optimistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.optimistic, 0));
+  const activeDeals = workingDeals.length;
+  const riskDeals = scenarioDeals.filter((deal) => deal.flags.negative).length;
   const remaining = Math.max(0, TOTAL_PLAN - actual);
   const leftDays = daysLeft();
   const neededPerDay = round1(remaining / leftDays);
-  const velocity = buildFactVelocity(preparedDeals, historyRows);
+  const velocity = buildFactVelocity(scenarioDeals, historyRows);
   const risk = summarizeRisk(actual, realistic, optimistic);
 
   const summary = {
@@ -834,9 +859,9 @@ async function buildForecast() {
     neededPerDay,
     daysLeft: leftDays,
     activeDeals,
-    totalDeals: preparedDeals.length,
-    warmDeals: preparedDeals.filter((deal) => String(deal.categoryId) === WARM_CATEGORY_ID).length,
-    allWarmDeals: preparedDeals.filter((deal) => String(deal.categoryId) === WARM_CATEGORY_ID).length,
+    totalDeals: createdAcademicPeriodDeals.length,
+    warmDeals: scenarioDeals.length,
+    allWarmDeals: scenarioDeals.length,
     totalFunnels: new Set(preparedDeals.map((deal) => String(deal.categoryId))).size,
     riskDeals,
     risk,
@@ -851,7 +876,7 @@ async function buildForecast() {
     optimistic,
     todaySubmissions: velocity.today,
     last7dSubmissions: velocity.last7d,
-    stageCounts: buildByStage(preparedDeals).map((row) => ({ stage: row.stage, count: row.count })),
+    stageCounts: buildByStage(scenarioDeals).map((row) => ({ stage: row.stage, count: row.count })),
   };
   const snapshots = writeSnapshot(snapshotEntry);
 
@@ -870,17 +895,19 @@ async function buildForecast() {
       realistic: { label: "Реалистичный", value: realistic, progress: pct(realistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - realistic) },
       optimistic: { label: "Оптимистичный", value: optimistic, progress: pct(optimistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - optimistic) },
     },
-    byStage: buildByStage(preparedDeals),
-    bySource: buildBySource(preparedDeals),
-    managers: buildByManager(preparedDeals),
-    risks: buildRisks(preparedDeals),
-    bySpecialty: buildBySpecialty(preparedDeals),
-    byProgram: buildProgramRows(preparedDeals),
+    byStage: buildByStage(scenarioDeals),
+    bySource: buildBySource(scenarioDeals),
+    managers: buildByManager(scenarioDeals),
+    risks: buildRisks(scenarioDeals),
+    bySpecialty: buildBySpecialty(scenarioDeals),
+    byProgram: buildProgramRows(scenarioDeals),
     history: snapshots,
     debug: {
       historyMode,
       factVelocityMode: velocity.mode,
       loadedDeals: preparedDeals.length,
+      createdAcademicPeriodDeals: createdAcademicPeriodDeals.length,
+      scenarioDeals: scenarioDeals.length,
     },
     fields: {
       programField: PROGRAM_FIELD || null,
@@ -889,6 +916,8 @@ async function buildForecast() {
       lastCommunicationField: LAST_COMM_FIELD || "LAST_ACTIVITY_TIME / DATE_MODIFY",
       nextActionField: NEXT_ACTION_FIELD || null,
       method,
+      academicPeriodStart: academicPeriod().start.toISOString().slice(0, 10),
+      academicPeriodEnd: academicPeriod().end.toISOString().slice(0, 10),
       snapshotsFile: SNAPSHOT_FILE,
     },
   };
