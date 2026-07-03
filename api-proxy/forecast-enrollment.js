@@ -7,6 +7,7 @@ const INCLUDED_CATEGORY_IDS = String(process.env.ENROLLMENT_INCLUDE_CATEGORY_IDS
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+const DEFAULT_ADMISSION_CATEGORY_IDS = ["33", "53", "63", "65", "67", "69", "73", "75", "77"];
 const TARGET_DATE = process.env.ENROLLMENT_TARGET_DATE || "2026-08-25";
 const TOTAL_PLAN = Number(process.env.ENROLLMENT_PLAN_TOTAL || 800);
 
@@ -27,7 +28,7 @@ const UTM_TERM_FIELD = process.env.ENROLLMENT_UTM_TERM_FIELD || "";
 
 const CACHE_SECONDS = Number(process.env.ENROLLMENT_FORECAST_CACHE_SECONDS || 3600);
 const BITRIX_TIMEOUT_MS = Number(process.env.BITRIX_TIMEOUT_MS || 15000);
-const DEAL_LIMIT = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT || 5000);
+const DEAL_LIMIT = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT || 2000);
 const SNAPSHOT_DIR = path.join(__dirname, "data");
 const SNAPSHOT_FILE = path.join(SNAPSHOT_DIR, "enrollment-forecast-snapshots.json");
 
@@ -242,9 +243,17 @@ async function fetchDealCategories() {
   return categoryMap;
 }
 
+function resolveIncludedCategoryIds(categoryMap = new Map()) {
+  if (INCLUDED_CATEGORY_IDS.length) return INCLUDED_CATEGORY_IDS;
+  const available = new Set([...categoryMap.keys()]);
+  const defaults = DEFAULT_ADMISSION_CATEGORY_IDS.filter((id) => available.has(id));
+  if (defaults.length) return defaults;
+  return [...categoryMap.keys()];
+}
+
 async function fetchStageDictionary(categoryMap = new Map()) {
   const map = new Map();
-  const categoryIds = [...new Set([WARM_CATEGORY_ID, ...categoryMap.keys()])];
+  const categoryIds = [...new Set([WARM_CATEGORY_ID, ...resolveIncludedCategoryIds(categoryMap)])];
 
   for (const categoryId of categoryIds) {
     const entityIds = categoryId === "0" ? ["DEAL_STAGE", "DEAL_STAGE_0"] : [`DEAL_STAGE_${categoryId}`];
@@ -796,7 +805,7 @@ function writeSnapshot(entry) {
 async function buildForecast() {
   const categoryMap = await fetchDealCategories();
   const stageDict = await fetchStageDictionary(categoryMap);
-  const categoryIds = INCLUDED_CATEGORY_IDS.length ? INCLUDED_CATEGORY_IDS : [...categoryMap.keys()];
+  const categoryIds = resolveIncludedCategoryIds(categoryMap);
   const { deals: rawDeals, method } = await fetchDeals(categoryIds);
   const managerNames = await fetchUsers(rawDeals.map((deal) => deal.ASSIGNED_BY_ID));
   const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
