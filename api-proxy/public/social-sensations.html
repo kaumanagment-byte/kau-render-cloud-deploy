@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KAU AI Content Radar</title>
+  <style>
+    :root{--bg:#f3f1ea;--panel:#fffdf8;--text:#1f1a17;--muted:#6f665f;--line:#e3ddd4;--brand:#ae4f2b;--brand-dark:#7d361c;--sage:#627a59;--ink:#222630;--soft:#f7f2ea;--shadow:0 12px 30px rgba(74,48,26,.08)}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#f5efe7,#f1eee7);color:var(--text);font:14px/1.5 "Segoe UI",Arial,sans-serif}.shell{min-height:100vh;display:grid;grid-template-columns:220px minmax(0,1fr)}
+    aside{position:sticky;top:0;height:100vh;padding:18px 12px;background:rgba(255,253,248,.92);backdrop-filter:blur(14px);border-right:1px solid var(--line);display:flex;flex-direction:column}.brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}.mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;display:grid;place-items:center;font-weight:800}.brand span{display:block;font-size:12px;color:var(--muted)}
+    nav{display:grid;gap:4px}nav a{text-decoration:none;padding:10px;border-radius:10px;color:#615951}nav a:hover,nav a.active{background:#efe6da;color:#1d1714;font-weight:700}.status{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}.status strong,.status small{display:block}.status small{color:var(--muted)}
+    main{padding:20px;min-width:0}.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:26px;background:radial-gradient(circle at top right,#f8dccb 0,#fffdf8 40%,#fffdf8 100%);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);margin-bottom:14px}.eyebrow{text-transform:uppercase;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--brand);margin:0 0 6px}h1{font-size:50px;line-height:1;margin:0;max-width:780px}h2,h3,p{margin:0}.lead{margin-top:10px;color:#544d46;font-size:16px;max-width:900px}.refresh{height:42px;border:0;border-radius:999px;background:linear-gradient(135deg,var(--brand),var(--brand-dark));color:#fff;padding:0 18px;font-weight:750;cursor:pointer}
+    .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}.metric,.panel,.opp{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.metric{padding:16px}.metric span,.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:30px;margin:4px 0}
+    .layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:12px}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.panel-body{padding:16px 18px}.badge{display:inline-flex;padding:5px 9px;border-radius:999px;background:#efe6da;color:var(--brand-dark);font-size:12px;font-weight:700}
+    .source-list,.opps,.platform-list{display:grid;gap:10px}.source,.mini,.platform-card{padding:12px;border-radius:12px;background:var(--soft)}.source strong,.mini strong,.platform-card strong{display:block}.source a{color:var(--brand-dark)}.muted{color:var(--muted)}
+    .opps{gap:14px}.opp{padding:18px}.opp-top{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.opp h3{font-size:28px;margin-bottom:6px}.opp .summary{color:#4b433c}.platform-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.platform-card{height:100%}.platform-card h4{margin:0 0 8px;font-size:16px}.idea{padding:10px 0;border-top:1px solid rgba(0,0,0,.06)}.idea:first-child{border-top:0;padding-top:0}.idea p{margin-top:4px}.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.tag{padding:4px 7px;border-radius:999px;background:#fff;border:1px solid #eadfce;font-size:12px;color:#594f46}
+    .release{margin-top:14px}.release-body{white-space:pre-wrap;color:#322c27;line-height:1.65}.empty{padding:24px;color:var(--muted);text-align:center}
+    @media(max-width:1180px){.platform-grid,.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}.shell{grid-template-columns:1fr}aside{position:static;height:auto}.status{display:none}}@media(max-width:720px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:36px}.metrics,.platform-grid{grid-template-columns:1fr}}
+  </style>
+  <style>html.embed-mode .shell{grid-template-columns:1fr}html.embed-mode aside{display:none}html.embed-mode main{padding:0}</style>
+  <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed-mode");</script>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand"><span class="mark">KAU</span><div><strong>Command Center</strong><span>AI content radar</span></div></div>
+    <nav>
+      <a href="https://kau.kz/marketing/data/bitrex">Общий дашборд</a>
+      <a href="./tasks.html">Задачи</a>
+      <a href="./reviews.html">Отзывы 2ГИС</a>
+      <a class="active" href="./social-sensations.html">AI контент-радар</a>
+      <a href="./forecast.html">Новые прогнозы</a>
+    </nav>
+    <div class="status"><strong id="status">Загрузка</strong><small id="updated">Gemini radar</small></div>
+  </aside>
+  <main>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Gemini API · KAU source adaptation</p>
+        <h1>AI контент-радар для KAU</h1>
+        <p class="lead">Система анализирует актуальные страницы `kau.edu.kz`, внешние трендовые сигналы и собирает адаптированные идеи для Instagram, TikTok, LinkedIn и PR-материалов под бренд KAU.</p>
+      </div>
+      <button class="refresh" id="refresh">Обновить</button>
+    </header>
+
+    <section class="metrics">
+      <article class="metric"><span>Инфоповоды</span><strong id="oppCount">-</strong><small>главных тем для контента и PR</small></article>
+      <article class="metric"><span>Источники KAU</span><strong id="kauCount">-</strong><small>страниц сайта в анализе</small></article>
+      <article class="metric"><span>Тренд-сигналы</span><strong id="trendCount">-</strong><small>внешних интернет-сигналов</small></article>
+      <article class="metric"><span>Модель</span><strong id="modelName">-</strong><small>Gemini для генерации стратегии</small></article>
+    </section>
+
+    <section class="layout">
+      <aside class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Контекст</p><h2>Что вошло в анализ</h2></div><span class="badge" id="cacheState">-</span></div>
+        <div class="panel-body source-list">
+          <div class="mini"><strong>Бренд-сводка</strong><p class="muted" id="brandSummary">Загрузка...</p></div>
+          <div class="mini"><strong>Стратегический вывод</strong><p class="muted" id="strategicTakeaway">Загрузка...</p></div>
+          <div class="mini"><strong>Страницы KAU</strong><div id="kauSources"></div></div>
+          <div class="mini"><strong>Внешние сигналы</strong><div id="trendSources"></div></div>
+        </div>
+      </aside>
+
+      <section class="opps" id="opportunities"><div class="empty">Загрузка инфоповодов...</div></section>
+    </section>
+
+    <section class="panel release">
+      <div class="panel-head"><div><p class="eyebrow">PR</p><h2>Пресс-релиз</h2></div></div>
+      <div class="panel-body">
+        <h3 id="releaseHeadline">Загрузка...</h3>
+        <p class="muted" id="releaseSubheadline"></p>
+        <div class="release-body" id="releaseBody"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  const apiBase = location.protocol === "file:" ? "https://kau-command-center-api-cloud.onrender.com" : "";
+
+  function renderSourceList(items, targetId) {
+    $(targetId).innerHTML = (items || []).map((item) => `<div class="source"><strong>${esc(item.title)}</strong><a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">${esc(item.url)}</a></div>`).join("") || `<div class="empty">Нет данных</div>`;
+  }
+
+  function renderPlatformIdeas(title, items) {
+    return `
+      <section class="platform-card">
+        <h4>${esc(title)}</h4>
+        ${(items || []).map((idea) => `
+          <div class="idea">
+            <strong>${esc(idea.format)}</strong>
+            <p><b>Посыл:</b> ${esc(idea.message)}</p>
+            <p><b>Аудитория:</b> ${esc(idea.audience)}</p>
+            <p><b>Текст:</b> ${esc(idea.sample_post)}</p>
+            <p><b>Визуал:</b> ${esc(idea.visual_notes)}</p>
+            <div class="tags">${(idea.hashtags || []).map((tag) => `<span class="tag">${esc(tag)}</span>`).join("")}</div>
+          </div>
+        `).join("")}
+      </section>
+    `;
+  }
+
+  function renderOpportunities(items) {
+    $("opportunities").innerHTML = (items || []).map((item) => `
+      <article class="opp">
+        <div class="opp-top">
+          <div>
+            <p class="eyebrow">${esc(item.source_title)}</p>
+            <h3>${esc(item.title)}</h3>
+            <p class="summary">${esc(item.pr_angle)}</p>
+          </div>
+          <span class="badge">${esc((item.target_audience || []).join(", "))}</span>
+        </div>
+        <p class="muted" style="margin-top:8px">${esc(item.why_it_resonates)}</p>
+        <div class="platform-grid">
+          ${renderPlatformIdeas("Instagram", item.instagram)}
+          ${renderPlatformIdeas("TikTok", item.tiktok)}
+          ${renderPlatformIdeas("LinkedIn", item.linkedin)}
+        </div>
+      </article>
+    `).join("") || `<div class="empty">Gemini не вернул инфоповоды.</div>`;
+  }
+
+  function render(data) {
+    $("status").textContent = "Gemini online";
+    $("updated").textContent = new Date(data.updatedAt).toLocaleString("ru-RU");
+    $("oppCount").textContent = (data.opportunities || []).length;
+    $("kauCount").textContent = (data.rawSources?.kau || []).length;
+    $("trendCount").textContent = (data.rawSources?.trends || []).length;
+    $("modelName").textContent = data.model || "-";
+    $("cacheState").textContent = data.cache || "updated";
+    $("brandSummary").textContent = data.brandSummary || "-";
+    $("strategicTakeaway").textContent = data.strategicTakeaway || "-";
+    renderSourceList(data.rawSources?.kau, "kauSources");
+    renderSourceList(data.rawSources?.trends, "trendSources");
+    renderOpportunities(data.opportunities);
+    $("releaseHeadline").textContent = data.pressRelease?.headline || "Нет пресс-релиза";
+    $("releaseSubheadline").textContent = data.pressRelease?.subheadline || "";
+    $("releaseBody").textContent = data.pressRelease?.body || "";
+  }
+
+  async function load() {
+    $("refresh").disabled = true;
+    $("refresh").textContent = "Обновляю";
+    try {
+      const response = await fetch(`${apiBase}/api/social-sensations`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
+      render(data);
+    } catch (error) {
+      $("status").textContent = "Ошибка";
+      $("updated").textContent = error.message;
+      $("opportunities").innerHTML = `<div class="empty">${esc(error.message)}</div>`;
+    } finally {
+      $("refresh").disabled = false;
+      $("refresh").textContent = "Обновить";
+    }
+  }
+
+  $("refresh").addEventListener("click", load);
+  load();
+</script>
+</body>
+</html>
