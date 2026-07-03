@@ -3,6 +3,10 @@ const path = require("node:path");
 
 const BITRIX24_WEBHOOK_URL = String(process.env.BITRIX24_WEBHOOK_URL || process.env.BITRIX_WEBHOOK_URL || "").replace(/\/+$/, "");
 const WARM_CATEGORY_ID = String(process.env.ENROLLMENT_WARM_CATEGORY_ID || "65");
+const INCLUDED_CATEGORY_IDS = String(process.env.ENROLLMENT_INCLUDE_CATEGORY_IDS || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const TARGET_DATE = process.env.ENROLLMENT_TARGET_DATE || "2026-08-25";
 const TOTAL_PLAN = Number(process.env.ENROLLMENT_PLAN_TOTAL || 800);
 
@@ -44,8 +48,8 @@ const PROGRAM_PLANS = [
   { program: "Финансовые технологии", plan: 34 },
 ];
 
-function stage(code) {
-  return `C${WARM_CATEGORY_ID}:${code}`;
+function stage(code, categoryId = WARM_CATEGORY_ID) {
+  return `C${categoryId}:${code}`;
 }
 
 const STAGE_RULES = [
@@ -207,20 +211,57 @@ async function bitrix(method, params = {}) {
   }
 }
 
-async function fetchStageDictionary() {
-  try {
-    const payload = await bitrix("crm.status.list", { filter: { ENTITY_ID: `DEAL_STAGE_${WARM_CATEGORY_ID}` } });
-    const rows = Array.isArray(payload.result) ? payload.result : [];
-    const map = new Map();
-    for (const row of rows) {
-      const id = row.STATUS_ID || row.ID;
-      const name = row.NAME || row.STATUS_ID || row.ID;
-      if (id) map.set(id, name);
-    }
-    return map;
-  } catch {
-    return new Map();
+async function fetchDealCategories() {
+  const categoryMap = new Map();
+  const attempts = [
+    ["crm.category.list", { entityTypeId: 2 }],
+    ["crm.dealcategory.list", {}],
+  ];
+
+  for (const [method, params] of attempts) {
+    try {
+      const payload = await bitrix(method, params);
+      const rows = Array.isArray(payload.result?.categories)
+        ? payload.result.categories
+        : Array.isArray(payload.result?.items)
+          ? payload.result.items
+          : Array.isArray(payload.result)
+            ? payload.result
+            : [];
+      if (!rows.length) continue;
+      for (const row of rows) {
+        const id = String(firstNonEmpty(row.ID, row.id, row.categoryId, row.CATEGORY_ID) || "");
+        const name = firstNonEmpty(row.NAME, row.name, row.title, row.TITLE) || `Воронка ${id}`;
+        if (id) categoryMap.set(id, name);
+      }
+      break;
+    } catch {}
   }
+
+  if (!categoryMap.has(WARM_CATEGORY_ID)) categoryMap.set(WARM_CATEGORY_ID, "Теплая база");
+  return categoryMap;
+}
+
+async function fetchStageDictionary(categoryMap = new Map()) {
+  const map = new Map();
+  const categoryIds = [...new Set([WARM_CATEGORY_ID, ...categoryMap.keys()])];
+
+  for (const categoryId of categoryIds) {
+    const entityIds = categoryId === "0" ? ["DEAL_STAGE", "DEAL_STAGE_0"] : [`DEAL_STAGE_${categoryId}`];
+    for (const entityId of entityIds) {
+      try {
+        const payload = await bitrix("crm.status.list", { filter: { ENTITY_ID: entityId } });
+        const rows = Array.isArray(payload.result) ? payload.result : [];
+        for (const row of rows) {
+          const id = row.STATUS_ID || row.ID;
+          const name = row.NAME || row.STATUS_ID || row.ID;
+          if (id) map.set(String(id), name);
+        }
+      } catch {}
+    }
+  }
+
+  return map;
 }
 
 async function fetchDealsViaItemList(select) {
@@ -229,7 +270,7 @@ async function fetchDealsViaItemList(select) {
   while (deals.length < DEAL_LIMIT) {
     const payload = await bitrix("crm.item.list", {
       entityTypeId: 2,
-      filter: { categoryId: Number(WARM_CATEGORY_ID) },
+      filter: INCLUDED_CATEGORY_IDS.length ? { "@categoryId": INCLUDED_CATEGORY_IDS.map((id) => Number(id)) } : {},
       select,
       start,
     });
@@ -249,7 +290,7 @@ async function fetchDealsViaDealList(select) {
   while (deals.length < DEAL_LIMIT) {
     const payload = await bitrix("crm.deal.list", {
       order: { ID: "ASC" },
-      filter: { "=CATEGORY_ID": Number(WARM_CATEGORY_ID) },
+      filter: INCLUDED_CATEGORY_IDS.length ? { "@CATEGORY_ID": INCLUDED_CATEGORY_IDS.map((id) => Number(id)) } : {},
       select,
       start,
     });
@@ -360,6 +401,9 @@ function detectLang(deal) {
 
 function detectFunnel(text) {
   const haystack = normalize(text);
+  if (haystack.includes("теплая база") || haystack.includes("тёплая база")) {
+    return { name: "Теплая база ПК", multiplier: 1.25 };
+  }
   for (const row of FUNNEL_MULTIPLIERS) {
     if ((row.aliases || []).some((alias) => haystack.includes(normalize(alias)))) return row;
   }
@@ -428,7 +472,7 @@ function getNextActionDate(deal) {
   return firstNonEmpty(NEXT_ACTION_FIELD ? deal[NEXT_ACTION_FIELD] : "");
 }
 
-function prepareDeals(rawDeals, stageDict, managerNames) {
+function prepareDeals(rawDeals, stageDict, managerNames, categoryMap = new Map()) {
   const maps = buildStageRuleMaps(stageDict);
   const prepared = [];
   for (const deal of rawDeals) {
@@ -443,8 +487,10 @@ function prepareDeals(rawDeals, stageDict, managerNames) {
       negative: false,
     };
 
+    const categoryId = String(deal.CATEGORY_ID || WARM_CATEGORY_ID);
+    const categoryName = categoryMap.get(categoryId) || `Воронка ${categoryId}`;
     const sourceText = [deal.SOURCE_DESCRIPTION, deal.SOURCE_ID, rawFieldValue(UTM_SOURCE_FIELD ? deal[UTM_SOURCE_FIELD] : "")].filter(Boolean).join(" ");
-    const funnel = detectFunnel([sourceText, deal.TITLE].join(" "));
+    const funnel = detectFunnel([categoryName, sourceText, deal.TITLE].join(" "));
     const source = detectSource(sourceText);
     const lastCommunication = getLastCommunication(deal);
     const isWarmStage = ["joining_us", "will_submit", "interested_kau", "interested", "consultation"].includes(rule.key);
@@ -458,7 +504,8 @@ function prepareDeals(rawDeals, stageDict, managerNames) {
     prepared.push({
       id: String(deal.ID || ""),
       title: deal.TITLE || "",
-      categoryId: String(deal.CATEGORY_ID || WARM_CATEGORY_ID),
+      categoryId,
+      categoryName,
       stageId: String(deal.STAGE_ID || ""),
       stageName,
       stageKey: rule.key,
@@ -735,10 +782,11 @@ function writeSnapshot(entry) {
 }
 
 async function buildForecast() {
-  const stageDict = await fetchStageDictionary();
+  const categoryMap = await fetchDealCategories();
+  const stageDict = await fetchStageDictionary(categoryMap);
   const { deals: rawDeals, method } = await fetchDeals();
   const managerNames = await fetchUsers(rawDeals.map((deal) => deal.ASSIGNED_BY_ID));
-  const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames);
+  const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
   const { rows: historyRows, mode: historyMode } = await fetchStageHistory();
 
   const actual = preparedDeals.filter((deal) => deal.stageKey === "submitted").length;
@@ -764,7 +812,10 @@ async function buildForecast() {
     neededPerDay,
     daysLeft: leftDays,
     activeDeals,
-    allWarmDeals: preparedDeals.length,
+    totalDeals: preparedDeals.length,
+    warmDeals: preparedDeals.filter((deal) => String(deal.categoryId) === WARM_CATEGORY_ID).length,
+    allWarmDeals: preparedDeals.filter((deal) => String(deal.categoryId) === WARM_CATEGORY_ID).length,
+    totalFunnels: new Set(preparedDeals.map((deal) => String(deal.categoryId))).size,
     riskDeals,
     risk,
   };
@@ -787,6 +838,8 @@ async function buildForecast() {
     source: "Bitrix24 CRM",
     fetchMethod: method,
     categoryId: WARM_CATEGORY_ID,
+    includedCategoryIds: INCLUDED_CATEGORY_IDS.length ? INCLUDED_CATEGORY_IDS : [...categoryMap.keys()],
+    categories: [...categoryMap.entries()].map(([id, name]) => ({ id, name })),
     targetDate: TARGET_DATE,
     fetchedAt: new Date().toISOString(),
     summary,
