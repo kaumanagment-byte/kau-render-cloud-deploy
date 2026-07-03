@@ -4,6 +4,8 @@ const TARGET_DATE = process.env.ENROLLMENT_TARGET_DATE || "2026-08-25";
 const PROGRAM_FIELD = process.env.ENROLLMENT_PROGRAM_FIELD || "";
 const LANG_FIELD = process.env.ENROLLMENT_LANG_FIELD || "";
 const CACHE_SECONDS = Number(process.env.ENROLLMENT_FORECAST_CACHE_SECONDS || 180);
+const MAX_DEALS = Number(process.env.ENROLLMENT_FORECAST_MAX_DEALS || 5000);
+const BITRIX_TIMEOUT_MS = Number(process.env.BITRIX_TIMEOUT_MS || 25000);
 
 const PROGRAM_PLANS = [
   { program: "Международные отношения", plan: 130, kaz: 80, rus: 40, eng: 10 },
@@ -128,16 +130,29 @@ function daysLeft() {
 
 async function bitrix(method, params = {}) {
   if (!BITRIX24_WEBHOOK_URL) throw new Error("BITRIX24_WEBHOOK_URL is not configured");
-  const response = await fetch(`${BITRIX24_WEBHOOK_URL}/${method}.json`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.error) {
-    throw new Error(payload.error_description || payload.error || `Bitrix HTTP ${response.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BITRIX_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${BITRIX24_WEBHOOK_URL}/${method}.json`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let payload = {};
+    try { payload = text ? JSON.parse(text) : {}; }
+    catch { payload = { raw: text }; }
+    if (!response.ok || payload.error) {
+      throw new Error(payload.error_description || payload.error || `Bitrix HTTP ${response.status}`);
+    }
+    return payload;
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error(`Bitrix timeout after ${BITRIX_TIMEOUT_MS}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-  return payload;
 }
 
 async function fetchAllDeals() {
@@ -160,14 +175,14 @@ async function fetchAllDeals() {
   do {
     const payload = await bitrix("crm.deal.list", {
       order: { ID: "DESC" },
-      filter: { CATEGORY_ID: WARM_CATEGORY_ID },
+      filter: { "=CATEGORY_ID": Number(WARM_CATEGORY_ID) },
       select,
       start,
     });
     const batch = Array.isArray(payload.result) ? payload.result : [];
     deals.push(...batch);
     start = typeof payload.next === "number" ? payload.next : null;
-  } while (start !== null && deals.length < 20000);
+  } while (start !== null && deals.length < MAX_DEALS);
   return deals;
 }
 
@@ -236,7 +251,6 @@ function buildProgramRows(deals) {
 
 async function buildForecast() {
   const deals = await fetchAllDeals();
-  const userMap = await fetchUsers(deals.map((deal) => deal.ASSIGNED_BY_ID));
 
   const activeDeals = deals.filter((deal) => !NEGATIVE_STAGES.has(deal.STAGE_ID));
   const factDeals = deals.filter((deal) => FACT_STAGES.has(deal.STAGE_ID));
@@ -247,7 +261,7 @@ async function buildForecast() {
   for (const deal of deals) {
     add(stageMap, STAGE_LABELS[deal.STAGE_ID] || deal.STAGE_ID);
     add(sourceMap, deal.SOURCE_DESCRIPTION || deal.SOURCE_ID || "Не указан");
-    const managerName = userMap.get(String(deal.ASSIGNED_BY_ID || "")) || `ID ${deal.ASSIGNED_BY_ID || "?"}`;
+    const managerName = `ID ${deal.ASSIGNED_BY_ID || "?"}`;
     const current = managerMap.get(managerName) || { name: managerName, total: 0, fact: 0, realistic: 0 };
     current.total += 1;
     if (FACT_STAGES.has(deal.STAGE_ID)) current.fact += 1;
