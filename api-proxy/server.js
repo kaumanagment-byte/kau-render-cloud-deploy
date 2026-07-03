@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { tasksDashboard, reviewsDashboard } = require("./tasks-reviews");
 const { enrollmentDashboard, queueStatus } = require("./enrollment-queue");
+const { enrollmentForecast } = require("./forecast-enrollment");
 
 const PORT = Number(process.env.PORT || 8080);
 const TILDA_ORIGIN = process.env.TILDA_ORIGIN || "*";
@@ -298,13 +299,19 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/api/enrollment-forecast") {
+    try { send(res, 200, await enrollmentForecast()); }
+    catch (error) { send(res, 500, { ok: false, error: error.message }); }
+    return;
+  }
+
   if (url.pathname === "/api/queue/status") {
     try { send(res, 200, await queueStatus()); }
     catch (error) { send(res, 500, { ok: false, error: error.message }); }
     return;
   }
 
-  if (["/tasks.html", "/reviews.html", "/enrollment.html"].includes(url.pathname)) {
+  if (["/tasks.html", "/reviews.html", "/enrollment.html", "/forecast.html"].includes(url.pathname)) {
     const filePath = path.join(__dirname, "public", path.basename(url.pathname));
     try {
       const body = fs.readFileSync(filePath);
