@@ -2,6 +2,7 @@ const XLSX = require("xlsx");
 
 const CACHE_MS = Number(process.env.ENROLLMENT_CACHE_SECONDS || 300) * 1000;
 let cached = null;
+let graphTokenCache = null;
 
 function normalized(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ");
@@ -31,6 +32,54 @@ function downloadUrl(input) {
   return url.toString();
 }
 
+function graphConfigured() {
+  return Boolean(process.env.MICROSOFT_TENANT_ID && process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
+}
+
+async function graphAccessToken() {
+  if (graphTokenCache && graphTokenCache.expiresAt > Date.now() + 60000) return graphTokenCache.token;
+  const tenant = process.env.MICROSOFT_TENANT_ID;
+  const body = new URLSearchParams({
+    client_id: process.env.MICROSOFT_CLIENT_ID,
+    client_secret: process.env.MICROSOFT_CLIENT_SECRET,
+    scope: process.env.MICROSOFT_SCOPE || "https://graph.microsoft.com/.default",
+    grant_type: "client_credentials",
+  });
+  const response = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    signal: AbortSignal.timeout(30000),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.access_token) {
+    throw new Error(`Microsoft token error: ${payload.error_description || payload.error || response.status}`);
+  }
+  graphTokenCache = {
+    token: payload.access_token,
+    expiresAt: Date.now() + Number(payload.expires_in || 3600) * 1000,
+  };
+  return graphTokenCache.token;
+}
+
+function graphShareId(url) {
+  return `u!${Buffer.from(url, "utf8").toString("base64url")}`;
+}
+
+async function fetchViaGraph(source, signal) {
+  const token = await graphAccessToken();
+  const response = await fetch(`https://graph.microsoft.com/v1.0/shares/${graphShareId(source)}/driveItem/content`, {
+    headers: { Authorization: `Bearer ${token}` },
+    redirect: "follow",
+    signal,
+  });
+  if (!response.ok) {
+    const details = await response.text().catch(() => "");
+    throw new Error(`Microsoft Graph HTTP ${response.status}${details ? `: ${details.slice(0, 300)}` : ""}`);
+  }
+  return response;
+}
+
 async function fetchWorkbook() {
   const source = process.env.ENROLLMENT_XLSX_URL;
   if (!source) throw new Error("ENROLLMENT_XLSX_URL is not configured");
@@ -42,15 +91,13 @@ async function fetchWorkbook() {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
     };
     if (process.env.ENROLLMENT_XLSX_BEARER_TOKEN) headers.Authorization = `Bearer ${process.env.ENROLLMENT_XLSX_BEARER_TOKEN}`;
-    const response = await fetch(downloadUrl(source), {
-      signal: controller.signal,
-      redirect: "follow",
-      headers,
-    });
+    const response = graphConfigured()
+      ? await fetchViaGraph(source, controller.signal)
+      : await fetch(downloadUrl(source), { signal: controller.signal, redirect: "follow", headers });
     if (!response.ok) throw new Error(`SharePoint HTTP ${response.status}`);
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.subarray(0, 2).toString() !== "PK") {
-      throw new Error("SharePoint требует авторизацию. Создайте ссылку «Доступ всем по ссылке» или добавьте служебный токен");
+      throw new Error("SharePoint вернул не Excel. Проверьте ссылку и разрешения Microsoft Graph");
     }
     return XLSX.read(buffer, { type: "buffer", cellDates: true });
   } finally {
