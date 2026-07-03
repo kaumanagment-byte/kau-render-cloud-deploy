@@ -5,6 +5,7 @@ const { tasksDashboard, reviewsDashboard } = require("./tasks-reviews");
 const { enrollmentDashboard, queueStatus } = require("./enrollment-queue");
 const { enrollmentForecast } = require("./forecast-enrollment");
 const { socialSensations } = require("./social-sensations");
+const { kauSignals } = require("./kau-signals");
 
 const PORT = Number(process.env.PORT || 8080);
 const TILDA_ORIGIN = process.env.TILDA_ORIGIN || "*";
@@ -161,13 +162,19 @@ async function unified(range) {
   };
   const ads = await request(`${ADS_BASE_URL}/api/dashboard?range=${encodeURIComponent(range)}`, 25000);
   const status = await request(`${INTELLIGENCE_BASE_URL}/api/status`, 10000);
-  const summary = await request(`${INTELLIGENCE_BASE_URL}/api/summary`, 12000);
   const accounts = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/accounts`, 12000);
   const comparison = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/comparison`, 12000);
-  const trends = await request(`${INTELLIGENCE_BASE_URL}/api/trends/university`, 12000);
-  const digest = await request(`${INTELLIGENCE_BASE_URL}/api/kazakhstan/digest`, 12000);
-  const mentions = await request(`${INTELLIGENCE_BASE_URL}/api/kau/mentions`, 12000);
   const crm = await request(`${CRM_BASE_URL}/api/deal-dashboard?range=${encodeURIComponent(range)}`, 45000);
+  let localSignals = null;
+  try {
+    localSignals = await kauSignals();
+  } catch (error) {
+    localSignals = { ok: false, error: error.message };
+  }
+  const summary = localSignals?.ok ? { ok: true, payload: localSignals.summary } : await request(`${INTELLIGENCE_BASE_URL}/api/summary`, 12000);
+  const trends = localSignals?.ok ? { ok: true, payload: localSignals.trends } : await request(`${INTELLIGENCE_BASE_URL}/api/trends/university`, 12000);
+  const digest = localSignals?.ok ? { ok: true, payload: localSignals.digest } : await request(`${INTELLIGENCE_BASE_URL}/api/kazakhstan/digest`, 12000);
+  const mentions = localSignals?.ok ? { ok: true, payload: localSignals.mentions } : await request(`${INTELLIGENCE_BASE_URL}/api/kau/mentions`, 12000);
 
   const crmConfig = crm.ok
     ? { ok: true, payload: { configured: true, source: "crm-dashboard" } }
@@ -308,6 +315,12 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/social-sensations") {
     try { send(res, 200, await socialSensations()); }
+    catch (error) { send(res, 500, { ok: false, error: error.message }); }
+    return;
+  }
+
+  if (url.pathname === "/api/kau-signals") {
+    try { send(res, 200, await kauSignals()); }
     catch (error) { send(res, 500, { ok: false, error: error.message }); }
     return;
   }
