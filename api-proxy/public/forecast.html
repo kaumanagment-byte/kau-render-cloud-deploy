@@ -6,15 +6,68 @@
   <title>KAU Новые прогнозы набора</title>
   <style>
     :root{--bg:#f4f5f7;--panel:#fff;--text:#17191d;--muted:#6f7782;--line:#dfe3e8;--blue:#087bea;--green:#168a4b;--amber:#b56b00;--red:#c92b38;--soft:#f7f8fa}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,Arial,sans-serif}.shell{min-height:100vh;display:grid;grid-template-columns:210px minmax(0,1fr)}
-    aside{position:sticky;top:0;height:100vh;padding:18px 12px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column}.brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}.mark{width:36px;height:36px;border-radius:7px;background:#17191d;color:#fff;display:grid;place-items:center;font-weight:800}.brand span{display:block;font-size:12px;color:var(--muted)}
-    nav{display:grid;gap:4px}nav a{text-decoration:none;padding:10px;border-radius:7px;color:#626a75}nav a:hover,nav a.active{background:#e9eaed;color:#1c2026;font-weight:700}.status{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:8px}.status strong,.status small{display:block}.status small{color:var(--muted)}
-    main{padding:20px;min-width:0}.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:24px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:14px}.eyebrow{text-transform:uppercase;font-size:11px;font-weight:800;color:#667080;margin:0 0 5px}h1{font-size:46px;line-height:1;margin:0}h2,h3,p{margin:0}.lead{margin-top:8px;color:#505762;font-size:16px}.refresh{height:40px;border:0;border-radius:7px;background:var(--blue);color:#fff;padding:0 15px;font-weight:750;cursor:pointer}
-    .metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}.metric,.panel,.scenario{background:#fff;border:1px solid var(--line);border-radius:8px}.metric{padding:16px}.metric span,.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:30px;margin:3px 0}.metric.good strong{color:var(--green)}
-    .scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}.scenario{padding:16px}.scenario .top{display:flex;justify-content:space-between;gap:8px;align-items:center}.scenario h3{font-size:20px}.scenario strong{display:block;font-size:38px;margin:10px 0 4px}.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:#eef1f4;color:#606976;font-size:12px;font-weight:750}.badge.ok{background:#e8f7ee;color:var(--green)}.badge.warn{background:#fff3da;color:var(--amber)}.badge.bad{background:#fff0f2;color:var(--red)}
-    .bar{height:8px;background:#e9edf1;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--green)}.bar.blue i{background:var(--blue)}.bar.amber i{background:var(--amber)}.bar.red i{background:var(--red)}
-    .grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,.8fr);gap:12px;margin-bottom:12px}.panel-head{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.panel-body{padding:14px 17px}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:850px}th,td{text-align:left;padding:10px;border-bottom:1px solid #edf0f3;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--muted)}td.num,th.num{text-align:right}.muted{color:var(--muted)}.list{display:grid;gap:8px}.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:9px 0;border-bottom:1px solid #edf0f3}.row:last-child{border-bottom:0}.row span{color:var(--muted);font-size:12px}.empty{padding:24px;color:var(--muted);text-align:center}.note{padding:12px;border-radius:8px;background:var(--soft);color:#505762}.split{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.mini{padding:10px;border-radius:8px;background:var(--soft)}.mini strong{display:block;font-size:18px}.mini span{color:var(--muted);font-size:12px}
-    @media(max-width:1100px){.metrics{grid-template-columns:repeat(3,1fr)}.scenarios,.grid{grid-template-columns:1fr}.shell{grid-template-columns:1fr}aside{position:static;height:auto}.status{display:none}}@media(max-width:650px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:36px}.metrics{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr 1fr}}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,Arial,sans-serif}
+    .shell{min-height:100vh;display:grid;grid-template-columns:210px minmax(0,1fr)}
+    aside{position:sticky;top:0;height:100vh;padding:18px 12px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column}
+    .brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}
+    .mark{width:36px;height:36px;border-radius:7px;background:#17191d;color:#fff;display:grid;place-items:center;font-weight:800}
+    .brand span{display:block;font-size:12px;color:var(--muted)}
+    nav{display:grid;gap:4px}
+    nav a{text-decoration:none;padding:10px;border-radius:7px;color:#626a75}
+    nav a:hover,nav a.active{background:#e9eaed;color:#1c2026;font-weight:700}
+    .status{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:8px}
+    .status strong,.status small{display:block}
+    .status small{color:var(--muted)}
+    main{padding:20px;min-width:0}
+    .hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:24px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:14px}
+    .eyebrow{text-transform:uppercase;font-size:11px;font-weight:800;color:#667080;margin:0 0 5px}
+    h1{font-size:44px;line-height:1;margin:0}
+    h2,h3,p{margin:0}
+    .lead{margin-top:8px;color:#505762;font-size:16px;max-width:980px}
+    .refresh{height:40px;border:0;border-radius:7px;background:var(--blue);color:#fff;padding:0 15px;font-weight:750;cursor:pointer}
+    .metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    .metric,.panel,.scenario{background:#fff;border:1px solid var(--line);border-radius:8px}
+    .metric{padding:16px}
+    .metric span,.metric small{display:block;color:var(--muted)}
+    .metric strong{display:block;font-size:28px;margin:3px 0}
+    .metric.good strong{color:var(--green)}
+    .metric.warn strong{color:var(--amber)}
+    .metric.bad strong{color:var(--red)}
+    .scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    .scenario{padding:16px}
+    .scenario .top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+    .scenario h3{font-size:20px}
+    .scenario strong{display:block;font-size:36px;margin:10px 0 4px}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:#eef1f4;color:#606976;font-size:12px;font-weight:750}
+    .badge.ok{background:#e8f7ee;color:var(--green)}
+    .badge.warn{background:#fff3da;color:var(--amber)}
+    .badge.bad{background:#fff0f2;color:var(--red)}
+    .bar{height:8px;background:#e9edf1;border-radius:5px;overflow:hidden}
+    .bar i{display:block;height:100%;background:var(--green)}
+    .bar.blue i{background:var(--blue)}
+    .bar.amber i{background:var(--amber)}
+    .bar.red i{background:var(--red)}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+    .panel-head{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .panel-body{padding:14px 17px}
+    .table-wrap{overflow:auto}
+    table{border-collapse:collapse;width:100%;min-width:850px}
+    th,td{text-align:left;padding:10px;border-bottom:1px solid #edf0f3;vertical-align:top}
+    th{font-size:11px;text-transform:uppercase;color:var(--muted)}
+    td.num,th.num{text-align:right}
+    .muted{color:var(--muted)}
+    .list{display:grid;gap:8px}
+    .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:9px 0;border-bottom:1px solid #edf0f3}
+    .row:last-child{border-bottom:0}
+    .row span{color:var(--muted);font-size:12px}
+    .empty{padding:24px;color:var(--muted);text-align:center}
+    .note{padding:12px;border-radius:8px;background:var(--soft);color:#505762}
+    .danger{color:var(--red)}
+    .warning{color:var(--amber)}
+    .success{color:var(--green)}
+    @media(max-width:1200px){.metrics{grid-template-columns:repeat(3,1fr)}.scenarios,.grid{grid-template-columns:1fr}.shell{grid-template-columns:1fr}aside{position:static;height:auto}.status{display:none}}
+    @media(max-width:650px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:34px}.metrics{grid-template-columns:1fr 1fr}}
   </style>
   <style>html.embed-mode .shell{grid-template-columns:1fr}html.embed-mode aside{display:none}html.embed-mode main{padding:0}</style>
   <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed-mode");</script>
@@ -37,28 +90,94 @@
       <div>
         <p class="eyebrow">Admission forecast · Bitrix24 CRM</p>
         <h1>Новые прогнозы набора</h1>
-        <p class="lead">Факт считается из теплой базы: “Сдал документы” и все следующие стадии. Прогноз — по всей воронке с учетом вероятности каждой стадии.</p>
+        <p class="lead">Прогноз на дату 25.08.2026 считается по формуле из ТЗ: вероятность каждой сделки = вероятность стадии × коэффициент воронки × коэффициент источника × коэффициент давности коммуникации × коэффициент менеджера.</p>
       </div>
       <button class="refresh" id="refresh">Обновить</button>
     </header>
 
     <section class="metrics">
-      <article class="metric"><span>План</span><strong id="plan">-</strong><small>абитуриентов</small></article>
-      <article class="metric good"><span>Факт CRM</span><strong id="actual">-</strong><small id="progress">-</small></article>
-      <article class="metric"><span>Осталось</span><strong id="remaining">-</strong><small>до плана</small></article>
-      <article class="metric"><span>Теплая база</span><strong id="warmDeals">-</strong><small>сделок в воронке</small></article>
-      <article class="metric"><span>Нужный темп</span><strong id="pace">-</strong><small id="daysLeft">-</small></article>
+      <article class="metric good"><span>Факт сдали документы</span><strong id="actual">-</strong><small id="actualSub">-</small></article>
+      <article class="metric"><span>План</span><strong id="plan">-</strong><small>студентов</small></article>
+      <article class="metric warn"><span>Разрыв до плана</span><strong id="remaining">-</strong><small>нужно закрыть</small></article>
+      <article class="metric"><span>Нужно сдач в день</span><strong id="neededPerDay">-</strong><small id="daysLeft">-</small></article>
+      <article class="metric"><span>Скорость за 7 дней</span><strong id="actualPerDay7d">-</strong><small id="todayAndWeek">-</small></article>
     </section>
 
     <section class="scenarios">
       <article class="scenario"><div class="top"><h3>Осторожный</h3><span class="badge warn">низкий риск</span></div><strong id="consValue">-</strong><div class="bar amber"><i id="consBar"></i></div><p class="muted" id="consText">-</p></article>
-      <article class="scenario"><div class="top"><h3>Реалистичный</h3><span class="badge ok">рабочий план</span></div><strong id="realValue">-</strong><div class="bar blue"><i id="realBar"></i></div><p class="muted" id="realText">-</p></article>
-      <article class="scenario"><div class="top"><h3>Оптимистичный</h3><span class="badge">если дожать</span></div><strong id="optValue">-</strong><div class="bar"><i id="optBar"></i></div><p class="muted" id="optText">-</p></article>
+      <article class="scenario"><div class="top"><h3>Реалистичный</h3><span class="badge ok" id="riskBadge">риск</span></div><strong id="realValue">-</strong><div class="bar blue"><i id="realBar"></i></div><p class="muted" id="realText">-</p></article>
+      <article class="scenario"><div class="top"><h3>Оптимистичный</h3><span class="badge">дожим</span></div><strong id="optValue">-</strong><div class="bar"><i id="optBar"></i></div><p class="muted" id="optText">-</p></article>
     </section>
 
     <section class="grid">
       <article class="panel">
-        <div class="panel-head"><div><p class="eyebrow">Образовательные программы</p><h2>План, факт и прогноз</h2></div><span class="badge" id="programBadge">-</span></div>
+        <div class="panel-head"><div><p class="eyebrow">Воронка</p><h2>Прогноз по стадиям</h2></div><span class="badge" id="stageCountBadge">-</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Стадия</th><th class="num">Сделок</th><th class="num">Средняя вероятность</th><th class="num">Вклад в прогноз</th><th class="num">Доля прогноза</th></tr></thead>
+            <tbody id="stageRows"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Источники</p><h2>Прогноз по источникам</h2></div><span class="badge">Bitrix source</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Источник</th><th class="num">Сделок</th><th class="num">Сдали</th><th class="num">Конверсия</th><th class="num">Прогноз</th><th class="num">CPL</th><th class="num">CPA</th></tr></thead>
+            <tbody id="sourceRows"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Менеджеры</p><h2>Ответственные</h2></div><span class="badge" id="managerCountBadge">-</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Ответственный</th><th class="num">Сделок</th><th class="num">Сдали</th><th class="num">Горячие</th><th class="num">Просрочено</th><th class="num">Прогноз</th><th class="num">Конверсия</th><th class="num">Рейтинг</th></tr></thead>
+            <tbody id="managerRows"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Риски</p><h2>Что нужно дожать сейчас</h2></div><span class="badge bad" id="riskCountBadge">-</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Тип риска</th><th>Сделка</th><th>Стадия</th><th>Ответственный</th><th class="num">Дней</th><th>Приоритет</th></tr></thead>
+            <tbody id="riskRows"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Специальности</p><h2>Прогноз по специальностям</h2></div><span class="badge" id="specialtyCountBadge">-</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Специальность</th><th class="num">План</th><th class="num">Факт</th><th class="num">Прогноз</th><th class="num">Дельта</th><th class="num">Доля</th></tr></thead>
+            <tbody id="specialtyRows"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">История</p><h2>Снимки прогноза</h2></div><span class="badge" id="historyCountBadge">-</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Дата</th><th class="num">Факт</th><th class="num">Осторожный</th><th class="num">Реалистичный</th><th class="num">Оптимистичный</th><th class="num">Сдач сегодня</th></tr></thead>
+            <tbody id="historyRows"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Программы</p><h2>План, факт и прогноз</h2></div><span class="badge" id="programBadge">-</span></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Программа</th><th class="num">План</th><th class="num">Факт</th><th class="num">Осталось</th><th class="num">Реалистичный</th><th>Выполнение</th><th>Языки CRM</th></tr></thead>
@@ -66,68 +185,107 @@
           </table>
         </div>
       </article>
-      <div class="list">
-        <article class="panel"><div class="panel-head"><div><p class="eyebrow">Воронка</p><h2>Стадии теплой базы</h2></div></div><div class="panel-body list" id="stageRows"></div></article>
-        <article class="panel"><div class="panel-head"><div><p class="eyebrow">Источники</p><h2>Откуда идет набор</h2></div></div><div class="panel-body list" id="sourceRows"></div></article>
-      </div>
-    </section>
 
-    <section class="grid">
-      <article class="panel"><div class="panel-head"><div><p class="eyebrow">Команда</p><h2>Прогноз по ответственным</h2></div><span class="badge">топ 30</span></div><div class="table-wrap"><table><thead><tr><th>Ответственный</th><th class="num">Всего сделок</th><th class="num">Факт</th><th class="num">Реалистичный прогноз</th></tr></thead><tbody id="managerRows"></tbody></table></div></article>
-      <article class="panel"><div class="panel-head"><div><p class="eyebrow">Настройка</p><h2>Что проверять</h2></div></div><div class="panel-body list" id="settingsRows"></div></article>
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Настройка</p><h2>Поля и режимы</h2></div></div>
+        <div class="panel-body list" id="settingsRows"></div>
+      </article>
     </section>
   </main>
 </div>
 
 <script>
   const $ = (id) => document.getElementById(id);
-  const num = (v) => new Intl.NumberFormat("ru-RU").format(Number(v || 0));
+  const num = (v) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(Number(v || 0));
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
   const bar = (id, pct) => $(id).style.width = `${Math.max(0, Math.min(100, Number(pct || 0)))}%`;
 
-  function renderScenario(prefix, scenario, plan) {
+  function riskBadgeClass(key) {
+    if (key === "green") return "badge ok";
+    if (key === "yellow") return "badge warn";
+    return "badge bad";
+  }
+
+  function renderScenario(prefix, scenario) {
     $(`${prefix}Value`).textContent = num(scenario.value);
     $(`${prefix}Text`).textContent = `${scenario.progress}% плана · осталось ${num(scenario.remaining)}`;
     bar(`${prefix}Bar`, scenario.progress);
   }
 
-  function renderList(id, rows, label = "count") {
-    $(id).innerHTML = (rows || []).map((row) => `<div class="row"><div><strong>${esc(row.name)}</strong></div><strong>${num(row[label])}</strong></div>`).join("") || `<div class="empty">Нет данных</div>`;
+  function render() {}
+
+  function settingsBlock(data) {
+    const fields = data.fields || {};
+    const debug = data.debug || {};
+    return `
+      <div class="note">Формула из ТЗ: stage_probability × funnel_multiplier × source_multiplier × recency_multiplier × manager_multiplier. Сейчас manager_multiplier = 1.00, рейтинг считается отдельно.</div>
+      <div class="row"><div><strong>Метод загрузки</strong><span>сначала пробуем crm.item.list, потом fallback</span></div><strong>${esc(fields.method || "-")}</strong></div>
+      <div class="row"><div><strong>История стадий</strong><span>для факта сдач за сегодня и 7 дней</span></div><strong>${esc(debug.historyMode || "-")}</strong></div>
+      <div class="row"><div><strong>Поле программы</strong><span>${esc(fields.programField || "не задано")}</span></div><strong>${fields.programField ? "ok" : "fallback"}</strong></div>
+      <div class="row"><div><strong>Поле языка</strong><span>${esc(fields.languageField || "не задано")}</span></div><strong>${fields.languageField ? "ok" : "fallback"}</strong></div>
+      <div class="row"><div><strong>Поле последней коммуникации</strong><span>${esc(fields.lastCommunicationField || "-")}</span></div><strong>active</strong></div>
+      <div class="row"><div><strong>Файл истории</strong><span>ежедневные снимки прогноза</span></div><strong>${esc(fields.snapshotsFile || "-")}</strong></div>
+    `;
   }
 
-  function render(data) {
+  function renderData(data) {
     const s = data.summary || {};
     $("status").textContent = data.ok ? "Bitrix24 CRM online" : "Ошибка";
     $("updated").textContent = new Date(data.fetchedAt).toLocaleString("ru-RU");
-    $("plan").textContent = num(s.plan);
-    $("actual").textContent = num(s.actual);
-    $("progress").textContent = `${s.progress}% плана`;
-    $("remaining").textContent = num(s.remaining);
-    $("warmDeals").textContent = num(s.allWarmDeals);
-    $("pace").textContent = Number(s.requiredDailyPace || 0).toLocaleString("ru-RU");
-    $("daysLeft").textContent = `${num(s.daysLeft)} дней до дедлайна`;
 
-    renderScenario("cons", data.scenarios.conservative, s.plan);
-    renderScenario("real", data.scenarios.realistic, s.plan);
-    renderScenario("opt", data.scenarios.optimistic, s.plan);
+    $("actual").textContent = num(s.actual);
+    $("actualSub").textContent = `${num(s.progress)}% плана`;
+    $("plan").textContent = num(s.plan);
+    $("remaining").textContent = num(s.remaining);
+    $("neededPerDay").textContent = num(s.neededPerDay);
+    $("daysLeft").textContent = `${num(s.daysLeft)} дней до дедлайна`;
+    $("actualPerDay7d").textContent = num(s.actualPerDay7d);
+    $("todayAndWeek").textContent = `сегодня ${num(s.actualToday)} · 7 дней ${num(s.actualLast7d)}`;
+
+    renderScenario("cons", data.scenarios.conservative);
+    renderScenario("real", data.scenarios.realistic);
+    renderScenario("opt", data.scenarios.optimistic);
+
+    $("riskBadge").className = riskBadgeClass(s.risk?.key);
+    $("riskBadge").textContent = s.risk?.label || "Риск";
+    $("realText").textContent = `${data.scenarios.realistic.progress}% плана · ${s.risk?.text || ""}`;
+
+    $("stageCountBadge").textContent = `${num((data.byStage || []).length)} стадий`;
+    $("stageRows").innerHTML = (data.byStage || []).map((row) =>
+      `<tr><td><strong>${esc(row.stage)}</strong></td><td class="num">${num(row.count)}</td><td class="num">${num(row.avgProbability)}</td><td class="num"><strong>${num(row.forecastContribution)}</strong></td><td class="num">${num(row.forecastShare)}%</td></tr>`
+    ).join("") || `<tr><td colspan="5">Нет данных</td></tr>`;
+
+    $("sourceRows").innerHTML = (data.bySource || []).map((row) =>
+      `<tr><td><strong>${esc(row.source)}</strong></td><td class="num">${num(row.count)}</td><td class="num">${num(row.submitted)}</td><td class="num">${num(row.conversion)}%</td><td class="num"><strong>${num(row.projected)}</strong></td><td class="num">${row.leadCost == null ? "—" : num(row.leadCost)}</td><td class="num">${row.acquiredCost == null ? "—" : num(row.acquiredCost)}</td></tr>`
+    ).join("") || `<tr><td colspan="7">Нет данных</td></tr>`;
+
+    $("managerCountBadge").textContent = `${num((data.managers || []).length)} менеджеров`;
+    $("managerRows").innerHTML = (data.managers || []).map((row) =>
+      `<tr><td><strong>${esc(row.manager)}</strong></td><td class="num">${num(row.total)}</td><td class="num">${num(row.submitted)}</td><td class="num">${num(row.hotDeals)}</td><td class="num">${num(row.overdueCommunications)}</td><td class="num"><strong>${num(row.projected)}</strong></td><td class="num">${num(row.conversion)}%</td><td class="num">${num(row.rating)}</td></tr>`
+    ).join("") || `<tr><td colspan="8">Нет данных</td></tr>`;
+
+    $("riskCountBadge").textContent = `${num((data.risks || []).length)} рисков`;
+    $("riskRows").innerHTML = (data.risks || []).map((row) =>
+      `<tr><td><strong>${esc(row.type)}</strong></td><td>${esc(row.name)}</td><td>${esc(row.stage)}</td><td>${esc(row.manager)}</td><td class="num">${row.days == null ? "—" : num(row.days)}</td><td class="${row.severity === "high" ? "danger" : "warning"}">${esc(row.severity)}</td></tr>`
+    ).join("") || `<tr><td colspan="6">Нет рисков</td></tr>`;
+
+    $("specialtyCountBadge").textContent = `${num((data.bySpecialty || []).length)} специальностей`;
+    $("specialtyRows").innerHTML = (data.bySpecialty || []).map((row) =>
+      `<tr><td><strong>${esc(row.specialty)}</strong></td><td class="num">${num(row.plan)}</td><td class="num">${num(row.actual)}</td><td class="num"><strong>${num(row.forecast)}</strong></td><td class="num" style="color:${row.delta >= 0 ? '#168a4b' : '#c92b38'}">${num(row.delta)}</td><td class="num">${num(row.share)}%</td></tr>`
+    ).join("") || `<tr><td colspan="6">Нет данных</td></tr>`;
+
+    $("historyCountBadge").textContent = `${num((data.history || []).length)} дней`;
+    $("historyRows").innerHTML = (data.history || []).map((row) =>
+      `<tr><td><strong>${esc(row.date)}</strong></td><td class="num">${num(row.fact)}</td><td class="num">${num(row.conservative)}</td><td class="num">${num(row.realistic)}</td><td class="num">${num(row.optimistic)}</td><td class="num">${num(row.todaySubmissions)}</td></tr>`
+    ).join("") || `<tr><td colspan="6">Истории пока нет</td></tr>`;
 
     $("programBadge").textContent = `${num((data.byProgram || []).length)} программ`;
     $("programRows").innerHTML = (data.byProgram || []).map((row) => {
       const langText = `KAZ ${num(row.langs?.kaz)} · RUS ${num(row.langs?.rus)} · ENG ${num(row.langs?.eng)} · ? ${num(row.langs?.unknown)}`;
-      return `<tr><td><strong>${esc(row.program)}</strong></td><td class="num">${num(row.plan)}</td><td class="num"><strong>${num(row.actual)}</strong></td><td class="num">${num(row.remaining)}</td><td class="num">${num(row.realistic)}</td><td><div class="bar"><i style="width:${Math.min(100,row.progress)}%"></i></div><small>${row.progress}%</small></td><td class="muted">${esc(langText)}</td></tr>`;
+      return `<tr><td><strong>${esc(row.program)}</strong></td><td class="num">${num(row.plan)}</td><td class="num">${num(row.actual)}</td><td class="num">${num(row.remaining)}</td><td class="num"><strong>${num(row.realistic)}</strong></td><td><div class="bar"><i style="width:${Math.min(100, row.progress)}%"></i></div><small>${num(row.progress)}%</small></td><td class="muted">${esc(langText)}</td></tr>`;
     }).join("") || `<tr><td colspan="7">Нет данных</td></tr>`;
 
-    renderList("stageRows", data.byStage);
-    renderList("sourceRows", data.bySource);
-    $("managerRows").innerHTML = (data.consultants || []).map((row) => `<tr><td><strong>${esc(row.name)}</strong></td><td class="num">${num(row.total)}</td><td class="num">${num(row.fact)}</td><td class="num"><strong>${num(row.realistic)}</strong></td></tr>`).join("") || `<tr><td colspan="4">Нет данных</td></tr>`;
-
-    const fields = data.fields || {};
-    $("settingsRows").innerHTML = `
-      <div class="note">Факт: стадии “Сдал документы”, “Подписал договор”, “Оплатил за обучение”, “Поступил(-а)” в воронке ${esc(data.categoryId)}.</div>
-      <div class="row"><div><strong>Поле программы</strong><span>${fields.programSplitReady ? "разбивка по ОП включена" : "если нужна точная разбивка, добавь ENROLLMENT_PROGRAM_FIELD"}</span></div><strong>${esc(fields.programField || "нет")}</strong></div>
-      <div class="row"><div><strong>Поле языка</strong><span>${fields.languageSplitReady ? "разбивка KAZ/RUS/ENG включена" : "если нужна точная разбивка языков, добавь ENROLLMENT_LANG_FIELD"}</span></div><strong>${esc(fields.languageField || "нет")}</strong></div>
-      <div class="row"><div><strong>Источник</strong><span>берется из SOURCE_ID / SOURCE_DESCRIPTION</span></div><strong>Bitrix</strong></div>
-    `;
+    $("settingsRows").innerHTML = settingsBlock(data);
   }
 
   async function load() {
@@ -137,7 +295,7 @@
       const response = await fetch("/api/enrollment-forecast", { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
-      render(data);
+      renderData(data);
     } catch (error) {
       $("status").textContent = "Ошибка загрузки";
       $("updated").textContent = error.message;
@@ -149,7 +307,7 @@
 
   $("refresh").addEventListener("click", load);
   load();
-  setInterval(load, 300000);
+  setInterval(load, 10800000);
 </script>
 </body>
 </html>
