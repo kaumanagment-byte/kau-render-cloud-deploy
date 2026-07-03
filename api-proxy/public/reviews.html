@@ -19,6 +19,8 @@
     @media(max-width:1050px){.shell{grid-template-columns:1fr}aside{position:static;height:auto}.status{display:none}.metrics{grid-template-columns:repeat(2,1fr)}.review{grid-template-columns:150px minmax(0,1fr)}.action{grid-column:1/-1}}
     @media(max-width:650px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:36px}.metrics{grid-template-columns:1fr}.review{grid-template-columns:1fr}.action{grid-column:auto}}
   </style>
+  <style>html.embed-mode .shell{grid-template-columns:1fr}html.embed-mode aside{display:none}html.embed-mode main{padding:0}</style>
+  <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed-mode");</script>
 </head>
 <body>
   <div class="shell">
@@ -40,11 +42,11 @@
       <section class="metrics">
         <article class="metric"><span>Рейтинг</span><strong id="rating">-</strong><small>из 5</small></article>
         <article class="metric"><span>Всего отзывов</span><strong id="reviewsCount">-</strong><small>по филиалу</small></article>
-        <article class="metric"><span>Без ответа</span><strong id="unanswered">-</strong><small>среди последних 10</small></article>
+        <article class="metric"><span>Без ответа</span><strong id="unanswered">-</strong><small>среди последних 50</small></article>
         <article class="metric"><span>Негативные</span><strong id="negative">-</strong><small>оценка 1–3</small></article>
       </section>
       <section class="panel">
-        <div class="panel-head"><div><p class="eyebrow">Последние 10</p><h2>Комментарии и действия</h2></div><span class="badge" id="count">-</span></div>
+        <div class="panel-head"><div><p class="eyebrow">Последние 50</p><h2>Комментарии и действия</h2></div><span class="badge" id="count">-</span></div>
         <div class="reviews" id="reviews"><div class="empty">Загрузка отзывов...</div></div>
       </section>
     </main>
@@ -55,6 +57,8 @@
     const date=v=>v?new Date(v).toLocaleString("ru-RU",{day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"}):"-";
     const stars=n=>`${"★".repeat(Math.max(0,n))}${"☆".repeat(Math.max(0,5-n))}`;
     let loading=false;
+    const originalFetch=window.fetch.bind(window);
+    window.fetch=(input,init)=>originalFetch(typeof input==="string"?input.replace("&rated=false&sort_by=friends","&sort_by=date_created"):input,init);
     function render(data){
       $("status").textContent=data.ok?"2ГИС online":"Ошибка 2ГИС"; $("updated").textContent=data.ok?new Date(data.fetchedAt).toLocaleTimeString("ru-RU"):(data.error||"Нет данных");
       $("rating").textContent=Number(data.rating||0).toFixed(1); $("reviewsCount").textContent=number(data.reviewsCount); $("unanswered").textContent=number(data.unansweredCount); $("negative").textContent=number(data.negativeCount); $("count").textContent=`${number((data.reviews||[]).length)} отзывов`;

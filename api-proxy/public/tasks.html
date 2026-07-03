@@ -273,6 +273,8 @@
         .hero { align-items: flex-start; flex-direction: column; }
       }
     </style>
+    <style>html.embed-mode .shell{grid-template-columns:1fr}html.embed-mode aside{display:none}html.embed-mode main{padding:0}</style>
+    <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed-mode");</script>
   </head>
   <body>
     <div class="shell" data-api-base="">
