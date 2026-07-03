@@ -266,10 +266,10 @@ async function fetchDeals() {
   const select = [...new Set([...STANDARD_FIELDS, ...getEnvFields()])];
   try {
     const deals = await fetchDealsViaItemList(select);
-    if (deals.length) return { deals, method: "crm.item.list" };
+    if (deals.length) return { deals: deals.map(normalizeDealRecord), method: "crm.item.list" };
   } catch {}
   const deals = await fetchDealsViaDealList(select);
-  return { deals, method: "crm.deal.list" };
+  return { deals: deals.map(normalizeDealRecord), method: "crm.deal.list" };
 }
 
 async function fetchUsers(ids) {
@@ -398,6 +398,22 @@ function firstNonEmpty(...values) {
     if (String(raw || "").trim()) return raw;
   }
   return "";
+}
+
+function normalizeDealRecord(deal) {
+  return {
+    ...deal,
+    ID: firstNonEmpty(deal.ID, deal.id),
+    TITLE: firstNonEmpty(deal.TITLE, deal.title),
+    CATEGORY_ID: firstNonEmpty(deal.CATEGORY_ID, deal.categoryId, deal.category_id),
+    STAGE_ID: firstNonEmpty(deal.STAGE_ID, deal.stageId, deal.stage_id),
+    SOURCE_ID: firstNonEmpty(deal.SOURCE_ID, deal.sourceId, deal.source_id),
+    SOURCE_DESCRIPTION: firstNonEmpty(deal.SOURCE_DESCRIPTION, deal.sourceDescription, deal.source_description),
+    ASSIGNED_BY_ID: firstNonEmpty(deal.ASSIGNED_BY_ID, deal.assignedById, deal.assigned_by_id),
+    DATE_CREATE: firstNonEmpty(deal.DATE_CREATE, deal.createdTime, deal.created_time),
+    DATE_MODIFY: firstNonEmpty(deal.DATE_MODIFY, deal.updatedTime, deal.updated_time),
+    LAST_ACTIVITY_TIME: firstNonEmpty(deal.LAST_ACTIVITY_TIME, deal.lastActivityTime, deal.last_activity_time),
+  };
 }
 
 function getLastCommunication(deal) {
