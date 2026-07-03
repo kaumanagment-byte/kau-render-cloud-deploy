@@ -141,17 +141,22 @@ function buildInsights(data) {
 }
 
 async function unified(range) {
-  const [ads, status, summary, accounts, comparison, trends, digest, mentions, crm] = await Promise.all([
-    fetchJson(`${ADS_BASE_URL}/api/dashboard?range=${encodeURIComponent(range)}`, 25000),
-    fetchJson(`${INTELLIGENCE_BASE_URL}/api/status`, 10000),
-    fetchJson(`${INTELLIGENCE_BASE_URL}/api/summary`, 12000),
-    fetchJson(`${INTELLIGENCE_BASE_URL}/api/livedune/accounts`, 12000),
-    fetchJson(`${INTELLIGENCE_BASE_URL}/api/livedune/comparison`, 12000),
-    fetchJson(`${INTELLIGENCE_BASE_URL}/api/trends/university`, 12000),
-    fetchJson(`${INTELLIGENCE_BASE_URL}/api/kazakhstan/digest`, 12000),
-    fetchJson(`${INTELLIGENCE_BASE_URL}/api/kau/mentions`, 12000),
-    fetchJson(`${CRM_BASE_URL}/api/deal-dashboard?range=${encodeURIComponent(range)}`, 45000),
-  ]);
+  // Render's free services throttle a burst of parallel service-to-service calls.
+  // A short sequential warm-up keeps the unified dashboard below that limit.
+  const request = async (url, timeout) => {
+    const result = await fetchJson(url, timeout);
+    await sleep(350);
+    return result;
+  };
+  const ads = await request(`${ADS_BASE_URL}/api/dashboard?range=${encodeURIComponent(range)}`, 25000);
+  const status = await request(`${INTELLIGENCE_BASE_URL}/api/status`, 10000);
+  const summary = await request(`${INTELLIGENCE_BASE_URL}/api/summary`, 12000);
+  const accounts = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/accounts`, 12000);
+  const comparison = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/comparison`, 12000);
+  const trends = await request(`${INTELLIGENCE_BASE_URL}/api/trends/university`, 12000);
+  const digest = await request(`${INTELLIGENCE_BASE_URL}/api/kazakhstan/digest`, 12000);
+  const mentions = await request(`${INTELLIGENCE_BASE_URL}/api/kau/mentions`, 12000);
+  const crm = await request(`${CRM_BASE_URL}/api/deal-dashboard?range=${encodeURIComponent(range)}`, 45000);
 
   const crmConfig = crm.ok
     ? { ok: true, payload: { configured: true, source: "crm-dashboard" } }
