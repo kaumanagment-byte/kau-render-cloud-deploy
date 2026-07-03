@@ -7,6 +7,7 @@ const CACHE_SECONDS = Number(process.env.SOCIAL_RADAR_CACHE_SECONDS || 1800);
 const REQUEST_TIMEOUT_MS = Number(process.env.SOCIAL_RADAR_TIMEOUT_MS || 25000);
 const TREND_WINDOW_DAYS = Number(process.env.SOCIAL_RADAR_TREND_DAYS || 7);
 const MAX_TREND_ITEMS = Number(process.env.SOCIAL_RADAR_MAX_TRENDS || 18);
+const DAILY_PRESS_RELEASES = Number(process.env.SOCIAL_RADAR_PRESS_RELEASES || 10);
 
 const KAU_URLS = [
   "https://kau.edu.kz/",
@@ -51,7 +52,7 @@ function decodeXml(value) {
 
 function clip(value, limit = 1800) {
   const text = String(value || "").trim();
-  return text.length > limit ? `${text.slice(0, limit)}…` : text;
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
 }
 
 function toIsoDate(value) {
@@ -74,7 +75,7 @@ async function fetchText(url, timeoutMs = REQUEST_TIMEOUT_MS) {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "KAU-Content-Radar/2.0",
+        "User-Agent": "KAU-Content-Radar/3.0",
         "Accept-Language": "ru,en;q=0.8",
       },
     });
@@ -171,40 +172,50 @@ async function fetchTrendSources() {
 
 function buildPrompt(kauSources, trendSources) {
   return `
-Ты — senior PR strategist, social strategist и trend-adaptation editor для бренда KAU.
+Ты — senior PR strategist, social strategist, newsroom editor и trend-adaptation editor для бренда KAU.
 
-Работаешь в 2 слоя:
-1. Изучаешь, кто такой KAU, какие у него программы, ценности, возможности поступления, международность, гранты и новости.
-2. Анализируешь внешние тренды за последние ${TREND_WINDOW_DAYS} дней и переводишь их в адаптированные идеи под KAU.
+Работаешь в 3 слоя:
+1. Изучаешь KAU: кто мы, что предлагаем, какие программы, возможности, преимущества, международность, гранты, новости и карьерные смыслы есть на сайте.
+2. Анализируешь внешние тренды за последние ${TREND_WINDOW_DAYS} дней: что шумит в новостях, какие форматы собирают самый большой охват, какие механики залетают в соцсетях.
+3. Превращаешь это в контент и PR-поводы именно для KAU.
 
 Критически важно:
 - Используй только факты из источников ниже.
 - Если в задаче пользователя и на сайте есть расхождение, доверяй сайту KAU.
 - Не придумывай несуществующие программы, рейтинги, партнерства, кампусы, цифры или события.
-- Если внешний тренд похож на крупный stunt, pop-up, public activation или visual spectacle (например, как бренды делают проекции, подсветки, городские спецпроекты, viral performance, social-first challenge), не копируй его буквально. Опиши механику тренда и предложи, как ее можно адаптировать под KAU реалистично и брендово.
-- Приоритет: последние ${TREND_WINDOW_DAYS} дней, соцсети, молодежные форматы, заметные PR-механики, инфоповоды, которые можно запустить быстро.
+- Если внешний тренд похож на крупный stunt, pop-up, public activation, visual spectacle, projection show, city stunt или viral performance, не копируй его буквально. Объясни механику и предложи реалистичную адаптацию под KAU.
+- Приоритет: последние ${TREND_WINDOW_DAYS} дней, максимальный охват, высокий новостной шум, молодежные форматы, быстро запускаемые идеи.
 
 Что нужно вернуть:
-1. brand_summary — кратко: кто такой KAU, что он предлагает, какой у него образ и почему это важно для контента.
-2. strategic_takeaway — главный вывод: какие типы трендов KAU стоит забирать прямо сейчас.
+1. brand_summary — кто такой KAU и какие сильные стороны у бренда.
+2. strategic_takeaway — какие тренды и форматы стоит забирать прямо сейчас.
 3. analyzed_sources — какие сигналы реально повлияли на вывод.
-4. opportunities — от 6 до 8 сильных инфоповодов.
+4. newsroom_summary:
+   - what_is_loud_now
+   - highest_reach_theme
+   - fastest_content_move
+5. opportunities — от 8 до 12 сильных инфоповодов.
 
 Для каждого opportunity обязательно верни:
 - title
 - source_title
 - source_type
 - source_date
-- trend_mechanic — в чем механика тренда
-- kau_adaptation — как именно это переложить на KAU
+- trend_mechanic
+- kau_adaptation
 - pr_angle
 - why_it_resonates
 - target_audience (массив)
 - priority (high / medium)
+- reach_potential (high / medium / low)
+- reach_reason
+- news_noise_score (0-100)
+- viral_score (0-100)
+- recommended_speed (сегодня / 24 часа / 3 дня)
+- press_hook
 - instagram — 3 идеи
 - tiktok — 3 идеи
 - linkedin — 3 идеи
-- press_hook — короткая подводка для медиа или пресс-службы
 
 Для каждой идеи в instagram / tiktok / linkedin укажи:
 - message
@@ -214,7 +225,16 @@ function buildPrompt(kauSources, trendSources) {
 - hashtags
 - visual_notes
 
-5. press_release:
+6. daily_press_releases — массив из ${DAILY_PRESS_RELEASES} пресс-релизов на день.
+Для каждого daily_press_release верни:
+- headline
+- subheadline
+- body
+- based_on
+- angle
+- urgency (high / medium)
+
+7. press_release — один главный флагманский пресс-релиз:
 - headline
 - subheadline
 - body
@@ -222,9 +242,10 @@ function buildPrompt(kauSources, trendSources) {
 Требования к стилю:
 - Пиши по-русски.
 - Тон профессиональный, но живой и читаемый.
-- Не пиши слишком общо: нужны конкретные адаптации под KAU.
-- Покажи, как тренд из сети превращается в контент, PR-повод, mini-campaign, Reels/TikTok, серию постов или media story.
-- Делай упор на абитуриентов, родителей, партнеров, работодателей и молодых специалистов — только если это следует из сайта KAU.
+- Нужны конкретные адаптации под KAU.
+- Отдельно подчеркивай темы с максимальным потенциалом охвата.
+- Отдельно выделяй, что именно шумит в новостях.
+- Покажи, как тренд из сети превращается в контент, PR-повод, mini-campaign, Reels/TikTok, серию постов, спецпроект или media story.
 
 Источники KAU:
 ${kauSources.map((item, index) => `KAU_SOURCE_${index + 1}
@@ -265,6 +286,15 @@ async function callGemini(prompt) {
               required: ["title", "type", "angle"],
             },
           },
+          newsroom_summary: {
+            type: "OBJECT",
+            properties: {
+              what_is_loud_now: { type: "STRING" },
+              highest_reach_theme: { type: "STRING" },
+              fastest_content_move: { type: "STRING" },
+            },
+            required: ["what_is_loud_now", "highest_reach_theme", "fastest_content_move"],
+          },
           opportunities: {
             type: "ARRAY",
             items: {
@@ -280,6 +310,11 @@ async function callGemini(prompt) {
                 why_it_resonates: { type: "STRING" },
                 target_audience: { type: "ARRAY", items: { type: "STRING" } },
                 priority: { type: "STRING" },
+                reach_potential: { type: "STRING" },
+                reach_reason: { type: "STRING" },
+                news_noise_score: { type: "NUMBER" },
+                viral_score: { type: "NUMBER" },
+                recommended_speed: { type: "STRING" },
                 press_hook: { type: "STRING" },
                 instagram: {
                   type: "ARRAY",
@@ -338,11 +373,31 @@ async function callGemini(prompt) {
                 "why_it_resonates",
                 "target_audience",
                 "priority",
+                "reach_potential",
+                "reach_reason",
+                "news_noise_score",
+                "viral_score",
+                "recommended_speed",
                 "press_hook",
                 "instagram",
                 "tiktok",
                 "linkedin",
               ],
+            },
+          },
+          daily_press_releases: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                headline: { type: "STRING" },
+                subheadline: { type: "STRING" },
+                body: { type: "STRING" },
+                based_on: { type: "STRING" },
+                angle: { type: "STRING" },
+                urgency: { type: "STRING" },
+              },
+              required: ["headline", "subheadline", "body", "based_on", "angle", "urgency"],
             },
           },
           press_release: {
@@ -355,7 +410,15 @@ async function callGemini(prompt) {
             required: ["headline", "subheadline", "body"],
           },
         },
-        required: ["brand_summary", "strategic_takeaway", "analyzed_sources", "opportunities", "press_release"],
+        required: [
+          "brand_summary",
+          "strategic_takeaway",
+          "analyzed_sources",
+          "newsroom_summary",
+          "opportunities",
+          "daily_press_releases",
+          "press_release",
+        ],
       },
     },
   };
@@ -401,7 +464,9 @@ async function socialSensations() {
     brandSummary: data.brand_summary,
     strategicTakeaway: data.strategic_takeaway,
     analyzedSources: data.analyzed_sources || [],
+    newsroomSummary: data.newsroom_summary || null,
     opportunities: data.opportunities || [],
+    dailyPressReleases: data.daily_press_releases || [],
     pressRelease: data.press_release || null,
     rawSources: {
       kau: kauSources.map((item) => ({ title: item.title, url: item.url })),
