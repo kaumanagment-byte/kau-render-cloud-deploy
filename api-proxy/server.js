@@ -141,6 +141,15 @@ function buildInsights(data) {
 }
 
 async function unified(range) {
+  // Wake sleeping Render services before requesting their heavier dashboards.
+  // Free instances often return 429 during the first burst immediately after a deploy.
+  await fetchJson(`${ADS_BASE_URL}/health`, 60000);
+  await sleep(800);
+  await fetchJson(`${INTELLIGENCE_BASE_URL}/health`, 60000);
+  await sleep(800);
+  await fetchJson(`${CRM_BASE_URL}/health`, 60000);
+  await sleep(1800);
+
   // Render's free services throttle a burst of parallel service-to-service calls.
   // A short sequential warm-up keeps the unified dashboard below that limit.
   const request = async (url, timeout) => {
