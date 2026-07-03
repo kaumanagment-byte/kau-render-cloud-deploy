@@ -85,7 +85,7 @@ async function tasksDashboard(rangeName = "7d") {
 
 async function reviewsDashboard() {
   if (!TWOGIS_API_KEY) throw new Error("TWOGIS_API_KEY is not configured");
-  const params = new URLSearchParams({ limit: "10", offset: "0", is_advertiser: "false", fields: "meta.providers,meta.branch_rating,meta.branch_reviews_count,meta.total_count,reviews.hiding_reason,reviews.emojis,reviews.trust_factors", sort_by: "date_created", key: TWOGIS_API_KEY, locale: "ru_KZ" });
+  const params = new URLSearchParams({ limit: "50", offset: "0", is_advertiser: "false", fields: "meta.providers,meta.branch_rating,meta.branch_reviews_count,meta.total_count,reviews.hiding_reason,reviews.emojis,reviews.trust_factors", rated: "false", sort_by: "friends", key: TWOGIS_API_KEY, locale: "ru_KZ" });
   const response = await fetch(`https://public-api.reviews.2gis.com/3.0/branches/${encodeURIComponent(TWOGIS_BRANCH_ID)}/reviews?${params}`, { headers: { Accept: "application/json", "User-Agent": "KAU-Reputation-Monitor/1.0" } });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.message || `2GIS HTTP ${response.status}`);
