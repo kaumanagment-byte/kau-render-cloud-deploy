@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KAU Новые прогнозы набора</title>
+  <style>
+    :root{--bg:#f4f5f7;--panel:#fff;--text:#17191d;--muted:#6f7782;--line:#dfe3e8;--blue:#087bea;--green:#168a4b;--amber:#b56b00;--red:#c92b38;--soft:#f7f8fa}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,Arial,sans-serif}.shell{min-height:100vh;display:grid;grid-template-columns:210px minmax(0,1fr)}
+    aside{position:sticky;top:0;height:100vh;padding:18px 12px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column}.brand{display:flex;gap:10px;align-items:center;margin-bottom:26px}.mark{width:36px;height:36px;border-radius:7px;background:#17191d;color:#fff;display:grid;place-items:center;font-weight:800}.brand span{display:block;font-size:12px;color:var(--muted)}
+    nav{display:grid;gap:4px}nav a{text-decoration:none;padding:10px;border-radius:7px;color:#626a75}nav a:hover,nav a.active{background:#e9eaed;color:#1c2026;font-weight:700}.status{margin-top:auto;padding:12px;border:1px solid var(--line);border-radius:8px}.status strong,.status small{display:block}.status small{color:var(--muted)}
+    main{padding:20px;min-width:0}.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:24px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:14px}.eyebrow{text-transform:uppercase;font-size:11px;font-weight:800;color:#667080;margin:0 0 5px}h1{font-size:46px;line-height:1;margin:0}h2,h3,p{margin:0}.lead{margin-top:8px;color:#505762;font-size:16px}.refresh{height:40px;border:0;border-radius:7px;background:var(--blue);color:#fff;padding:0 15px;font-weight:750;cursor:pointer}
+    .metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}.metric,.panel,.scenario{background:#fff;border:1px solid var(--line);border-radius:8px}.metric{padding:16px}.metric span,.metric small{display:block;color:var(--muted)}.metric strong{display:block;font-size:30px;margin:3px 0}.metric.good strong{color:var(--green)}
+    .scenarios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}.scenario{padding:16px}.scenario .top{display:flex;justify-content:space-between;gap:8px;align-items:center}.scenario h3{font-size:20px}.scenario strong{display:block;font-size:38px;margin:10px 0 4px}.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;background:#eef1f4;color:#606976;font-size:12px;font-weight:750}.badge.ok{background:#e8f7ee;color:var(--green)}.badge.warn{background:#fff3da;color:var(--amber)}.badge.bad{background:#fff0f2;color:var(--red)}
+    .bar{height:8px;background:#e9edf1;border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--green)}.bar.blue i{background:var(--blue)}.bar.amber i{background:var(--amber)}.bar.red i{background:var(--red)}
+    .grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,.8fr);gap:12px;margin-bottom:12px}.panel-head{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}.panel-body{padding:14px 17px}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:850px}th,td{text-align:left;padding:10px;border-bottom:1px solid #edf0f3;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--muted)}td.num,th.num{text-align:right}.muted{color:var(--muted)}.list{display:grid;gap:8px}.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:9px 0;border-bottom:1px solid #edf0f3}.row:last-child{border-bottom:0}.row span{color:var(--muted);font-size:12px}.empty{padding:24px;color:var(--muted);text-align:center}.note{padding:12px;border-radius:8px;background:var(--soft);color:#505762}.split{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.mini{padding:10px;border-radius:8px;background:var(--soft)}.mini strong{display:block;font-size:18px}.mini span{color:var(--muted);font-size:12px}
+    @media(max-width:1100px){.metrics{grid-template-columns:repeat(3,1fr)}.scenarios,.grid{grid-template-columns:1fr}.shell{grid-template-columns:1fr}aside{position:static;height:auto}.status{display:none}}@media(max-width:650px){main{padding:10px}.hero{align-items:flex-start;flex-direction:column}h1{font-size:36px}.metrics{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr 1fr}}
+  </style>
+  <style>html.embed-mode .shell{grid-template-columns:1fr}html.embed-mode aside{display:none}html.embed-mode main{padding:0}</style>
+  <script>if(new URLSearchParams(location.search).get("embed")==="1")document.documentElement.classList.add("embed-mode");</script>
+</head>
+<body>
+<div class="shell">
+  <aside>
+    <div class="brand"><span class="mark">KAU</span><div><strong>Command Center</strong><span>Приемная комиссия</span></div></div>
+    <nav>
+      <a href="https://kau.kz/marketing/data/bitrex">Общий дашборд</a>
+      <a href="./tasks.html">Задачи</a>
+      <a href="./reviews.html">Отзывы 2ГИС</a>
+      <a href="./enrollment.html">План набора</a>
+      <a class="active" href="./forecast.html">Новые прогнозы</a>
+    </nav>
+    <div class="status"><strong id="status">Загрузка данных</strong><small id="updated">Bitrix24 CRM</small></div>
+  </aside>
+  <main>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Admission forecast · Bitrix24 CRM</p>
+        <h1>Новые прогнозы набора</h1>
+        <p class="lead">Факт считается из теплой базы: “Сдал документы” и все следующие стадии. Прогноз — по всей воронке с учетом вероятности каждой стадии.</p>
+      </div>
+      <button class="refresh" id="refresh">Обновить</button>
+    </header>
+
+    <section class="metrics">
+      <article class="metric"><span>План</span><strong id="plan">-</strong><small>абитуриентов</small></article>
+      <article class="metric good"><span>Факт CRM</span><strong id="actual">-</strong><small id="progress">-</small></article>
+      <article class="metric"><span>Осталось</span><strong id="remaining">-</strong><small>до плана</small></article>
+      <article class="metric"><span>Теплая база</span><strong id="warmDeals">-</strong><small>сделок в воронке</small></article>
+      <article class="metric"><span>Нужный темп</span><strong id="pace">-</strong><small id="daysLeft">-</small></article>
+    </section>
+
+    <section class="scenarios">
+      <article class="scenario"><div class="top"><h3>Осторожный</h3><span class="badge warn">низкий риск</span></div><strong id="consValue">-</strong><div class="bar amber"><i id="consBar"></i></div><p class="muted" id="consText">-</p></article>
+      <article class="scenario"><div class="top"><h3>Реалистичный</h3><span class="badge ok">рабочий план</span></div><strong id="realValue">-</strong><div class="bar blue"><i id="realBar"></i></div><p class="muted" id="realText">-</p></article>
+      <article class="scenario"><div class="top"><h3>Оптимистичный</h3><span class="badge">если дожать</span></div><strong id="optValue">-</strong><div class="bar"><i id="optBar"></i></div><p class="muted" id="optText">-</p></article>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-head"><div><p class="eyebrow">Образовательные программы</p><h2>План, факт и прогноз</h2></div><span class="badge" id="programBadge">-</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Программа</th><th class="num">План</th><th class="num">Факт</th><th class="num">Осталось</th><th class="num">Реалистичный</th><th>Выполнение</th><th>Языки CRM</th></tr></thead>
+            <tbody id="programRows"></tbody>
+          </table>
+        </div>
+      </article>
+      <div class="list">
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">Воронка</p><h2>Стадии теплой базы</h2></div></div><div class="panel-body list" id="stageRows"></div></article>
+        <article class="panel"><div class="panel-head"><div><p class="eyebrow">Источники</p><h2>Откуда идет набор</h2></div></div><div class="panel-body list" id="sourceRows"></div></article>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="panel"><div class="panel-head"><div><p class="eyebrow">Команда</p><h2>Прогноз по ответственным</h2></div><span class="badge">топ 30</span></div><div class="table-wrap"><table><thead><tr><th>Ответственный</th><th class="num">Всего сделок</th><th class="num">Факт</th><th class="num">Реалистичный прогноз</th></tr></thead><tbody id="managerRows"></tbody></table></div></article>
+      <article class="panel"><div class="panel-head"><div><p class="eyebrow">Настройка</p><h2>Что проверять</h2></div></div><div class="panel-body list" id="settingsRows"></div></article>
+    </section>
+  </main>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const num = (v) => new Intl.NumberFormat("ru-RU").format(Number(v || 0));
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  const bar = (id, pct) => $(id).style.width = `${Math.max(0, Math.min(100, Number(pct || 0)))}%`;
+
+  function renderScenario(prefix, scenario, plan) {
+    $(`${prefix}Value`).textContent = num(scenario.value);
+    $(`${prefix}Text`).textContent = `${scenario.progress}% плана · осталось ${num(scenario.remaining)}`;
+    bar(`${prefix}Bar`, scenario.progress);
+  }
+
+  function renderList(id, rows, label = "count") {
+    $(id).innerHTML = (rows || []).map((row) => `<div class="row"><div><strong>${esc(row.name)}</strong></div><strong>${num(row[label])}</strong></div>`).join("") || `<div class="empty">Нет данных</div>`;
+  }
+
+  function render(data) {
+    const s = data.summary || {};
+    $("status").textContent = data.ok ? "Bitrix24 CRM online" : "Ошибка";
+    $("updated").textContent = new Date(data.fetchedAt).toLocaleString("ru-RU");
+    $("plan").textContent = num(s.plan);
+    $("actual").textContent = num(s.actual);
+    $("progress").textContent = `${s.progress}% плана`;
+    $("remaining").textContent = num(s.remaining);
+    $("warmDeals").textContent = num(s.allWarmDeals);
+    $("pace").textContent = Number(s.requiredDailyPace || 0).toLocaleString("ru-RU");
+    $("daysLeft").textContent = `${num(s.daysLeft)} дней до дедлайна`;
+
+    renderScenario("cons", data.scenarios.conservative, s.plan);
+    renderScenario("real", data.scenarios.realistic, s.plan);
+    renderScenario("opt", data.scenarios.optimistic, s.plan);
+
+    $("programBadge").textContent = `${num((data.byProgram || []).length)} программ`;
+    $("programRows").innerHTML = (data.byProgram || []).map((row) => {
+      const langText = `KAZ ${num(row.langs?.kaz)} · RUS ${num(row.langs?.rus)} · ENG ${num(row.langs?.eng)} · ? ${num(row.langs?.unknown)}`;
+      return `<tr><td><strong>${esc(row.program)}</strong></td><td class="num">${num(row.plan)}</td><td class="num"><strong>${num(row.actual)}</strong></td><td class="num">${num(row.remaining)}</td><td class="num">${num(row.realistic)}</td><td><div class="bar"><i style="width:${Math.min(100,row.progress)}%"></i></div><small>${row.progress}%</small></td><td class="muted">${esc(langText)}</td></tr>`;
+    }).join("") || `<tr><td colspan="7">Нет данных</td></tr>`;
+
+    renderList("stageRows", data.byStage);
+    renderList("sourceRows", data.bySource);
+    $("managerRows").innerHTML = (data.consultants || []).map((row) => `<tr><td><strong>${esc(row.name)}</strong></td><td class="num">${num(row.total)}</td><td class="num">${num(row.fact)}</td><td class="num"><strong>${num(row.realistic)}</strong></td></tr>`).join("") || `<tr><td colspan="4">Нет данных</td></tr>`;
+
+    const fields = data.fields || {};
+    $("settingsRows").innerHTML = `
+      <div class="note">Факт: стадии “Сдал документы”, “Подписал договор”, “Оплатил за обучение”, “Поступил(-а)” в воронке ${esc(data.categoryId)}.</div>
+      <div class="row"><div><strong>Поле программы</strong><span>${fields.programSplitReady ? "разбивка по ОП включена" : "если нужна точная разбивка, добавь ENROLLMENT_PROGRAM_FIELD"}</span></div><strong>${esc(fields.programField || "нет")}</strong></div>
+      <div class="row"><div><strong>Поле языка</strong><span>${fields.languageSplitReady ? "разбивка KAZ/RUS/ENG включена" : "если нужна точная разбивка языков, добавь ENROLLMENT_LANG_FIELD"}</span></div><strong>${esc(fields.languageField || "нет")}</strong></div>
+      <div class="row"><div><strong>Источник</strong><span>берется из SOURCE_ID / SOURCE_DESCRIPTION</span></div><strong>Bitrix</strong></div>
+    `;
+  }
+
+  async function load() {
+    $("refresh").disabled = true;
+    $("refresh").textContent = "Обновляю";
+    try {
+      const response = await fetch("/api/enrollment-forecast", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
+      render(data);
+    } catch (error) {
+      $("status").textContent = "Ошибка загрузки";
+      $("updated").textContent = error.message;
+    } finally {
+      $("refresh").disabled = false;
+      $("refresh").textContent = "Обновить";
+    }
+  }
+
+  $("refresh").addEventListener("click", load);
+  load();
+  setInterval(load, 300000);
+</script>
+</body>
+</html>
