@@ -32,6 +32,11 @@ const DEAL_LIMIT = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT || 900);
 const DEAL_LIMIT_PER_CATEGORY = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT_PER_CATEGORY || 100);
 const SNAPSHOT_DIR = path.join(__dirname, "data");
 const SNAPSHOT_FILE = path.join(SNAPSHOT_DIR, "enrollment-forecast-snapshots.json");
+const SCENARIO_SCALE = {
+  conservative: 0.55,
+  realistic: 0.5,
+  optimistic: 0.42,
+};
 
 const PROGRAM_PLANS = [
   { program: "Международные отношения", plan: 130 },
@@ -142,6 +147,10 @@ function round1(value) {
 
 function round2(value) {
   return Math.round(Number(value || 0) * 100) / 100;
+}
+
+function scenarioScale(key) {
+  return Number(SCENARIO_SCALE[key] || 1);
 }
 
 function pct(part, whole) {
@@ -934,7 +943,7 @@ function buildBySpecialty(actualDeals, forecastDeals) {
 
   for (const deal of forecastDeals) {
     const row = ensureProgramBucket(base, deal.program);
-    row.forecast += Number(deal.probability?.realistic || 0);
+    row.forecast += Number(deal.probability?.realistic || 0) * scenarioScale("realistic");
   }
 
   const totalForecast = forecastDeals.reduce((sum, deal) => sum + Number(deal.probability?.realistic || 0), 0) || 1;
@@ -962,9 +971,9 @@ function buildProgramRows(actualDeals, forecastDeals) {
 
   for (const deal of forecastDeals) {
     const row = ensureProgramBucket(base, deal.program);
-    row.realistic += Number(deal.probability?.realistic || 0);
-    row.conservative += Number(deal.probability?.conservative || 0);
-    row.optimistic += Number(deal.probability?.optimistic || 0);
+    row.realistic += Number(deal.probability?.realistic || 0) * scenarioScale("realistic");
+    row.conservative += Number(deal.probability?.conservative || 0) * scenarioScale("conservative");
+    row.optimistic += Number(deal.probability?.optimistic || 0) * scenarioScale("optimistic");
     row.langs[deal.language] = Number(row.langs[deal.language] || 0) + 1;
   }
 
@@ -1105,11 +1114,11 @@ async function buildForecast() {
     stageCounts.push({
       stage: group.label,
       count,
-      avgProbability: round2(group.realistic),
-      forecastContribution: round1(count * group.realistic),
+      avgProbability: round2(group.realistic * scenarioScale("realistic")),
+      forecastContribution: round1(count * group.realistic * scenarioScale("realistic")),
       forecastShare: 0,
-      conservativeContribution: round1(count * group.conservative),
-      optimisticContribution: round1(count * group.optimistic),
+      conservativeContribution: round1(count * group.conservative * scenarioScale("conservative")),
+      optimisticContribution: round1(count * group.optimistic * scenarioScale("optimistic")),
     });
   }
 
