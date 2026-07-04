@@ -29,6 +29,7 @@ const UTM_TERM_FIELD = process.env.ENROLLMENT_UTM_TERM_FIELD || "";
 const CACHE_SECONDS = Number(process.env.ENROLLMENT_FORECAST_CACHE_SECONDS || 3600);
 const BITRIX_TIMEOUT_MS = Number(process.env.BITRIX_TIMEOUT_MS || 15000);
 const DEAL_LIMIT = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT || 2000);
+const DEAL_LIMIT_PER_CATEGORY = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT_PER_CATEGORY || 350);
 const SNAPSHOT_DIR = path.join(__dirname, "data");
 const SNAPSHOT_FILE = path.join(SNAPSHOT_DIR, "enrollment-forecast-snapshots.json");
 
@@ -292,24 +293,28 @@ async function fetchStageDictionary(categoryMap = new Map()) {
 async function fetchDealsViaItemList(select, categoryIds = []) {
   const deals = [];
   const ids = categoryIds.length ? categoryIds : [WARM_CATEGORY_ID];
+  const perCategoryLimit = Math.max(50, Math.min(DEAL_LIMIT, DEAL_LIMIT_PER_CATEGORY || Math.ceil(DEAL_LIMIT / Math.max(1, ids.length))));
 
   for (const categoryId of ids) {
     let start = 0;
-    while (deals.length < DEAL_LIMIT) {
+    let categoryCount = 0;
+    while (deals.length < DEAL_LIMIT && categoryCount < perCategoryLimit) {
       const payload = await bitrix("crm.item.list", {
         entityTypeId: 2,
         filter: { categoryId: Number(categoryId) },
+        order: { id: "desc" },
         select,
         start,
       });
       const rows = Array.isArray(payload.result?.items) ? payload.result.items : Array.isArray(payload.items) ? payload.items : [];
       if (!rows.length) break;
-      deals.push(...rows);
+      const slice = rows.slice(0, Math.max(0, perCategoryLimit - categoryCount));
+      deals.push(...slice);
+      categoryCount += slice.length;
       const next = payload.result?.next ?? payload.next;
       if (typeof next !== "number") break;
       start = next;
     }
-    if (deals.length >= DEAL_LIMIT) break;
   }
 
   return [...new Map(deals.map((deal) => [String(firstNonEmpty(deal.ID, deal.id)), deal])).values()].slice(0, DEAL_LIMIT);
@@ -318,23 +323,26 @@ async function fetchDealsViaItemList(select, categoryIds = []) {
 async function fetchDealsViaDealList(select, categoryIds = []) {
   const deals = [];
   const ids = categoryIds.length ? categoryIds : [WARM_CATEGORY_ID];
+  const perCategoryLimit = Math.max(50, Math.min(DEAL_LIMIT, DEAL_LIMIT_PER_CATEGORY || Math.ceil(DEAL_LIMIT / Math.max(1, ids.length))));
 
   for (const categoryId of ids) {
     let start = 0;
-    while (deals.length < DEAL_LIMIT) {
+    let categoryCount = 0;
+    while (deals.length < DEAL_LIMIT && categoryCount < perCategoryLimit) {
       const payload = await bitrix("crm.deal.list", {
-        order: { ID: "DESC" },
+        order: { DATE_CREATE: "DESC", ID: "DESC" },
         filter: { "=CATEGORY_ID": Number(categoryId) },
         select,
         start,
       });
       const rows = Array.isArray(payload.result) ? payload.result : [];
       if (!rows.length) break;
-      deals.push(...rows);
+      const slice = rows.slice(0, Math.max(0, perCategoryLimit - categoryCount));
+      deals.push(...slice);
+      categoryCount += slice.length;
       if (typeof payload.next !== "number") break;
       start = payload.next;
     }
-    if (deals.length >= DEAL_LIMIT) break;
   }
 
   return [...new Map(deals.map((deal) => [String(firstNonEmpty(deal.ID, deal.id)), deal])).values()].slice(0, DEAL_LIMIT);
@@ -827,13 +835,11 @@ async function buildForecast() {
   const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
   const { rows: historyRows, mode: historyMode } = await fetchStageHistory();
 
-  const createdAcademicPeriodDeals = preparedDeals.filter((deal) => isWithinAcademicPeriod(deal.dateCreate));
-  const scenarioDeals = preparedDeals.filter((deal) =>
-    String(deal.categoryId) === WARM_CATEGORY_ID &&
-    !deal.flags.negative &&
-    deal.stageKey !== "unknown"
-  );
-  const factDeals = scenarioDeals.filter((deal) => deal.flags.fact);
+  const includedDeals = preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)));
+  const createdAcademicPeriodDeals = includedDeals.filter((deal) => isWithinAcademicPeriod(deal.dateCreate));
+  const recognizedDeals = includedDeals.filter((deal) => deal.stageKey !== "unknown");
+  const scenarioDeals = recognizedDeals.filter((deal) => !deal.flags.negative);
+  const factDeals = recognizedDeals.filter((deal) => deal.flags.fact);
   const workingDeals = scenarioDeals.filter((deal) => !deal.flags.fact);
 
   const actual = factDeals.length;
@@ -841,11 +847,11 @@ async function buildForecast() {
   const realistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.realistic, 0));
   const optimistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.optimistic, 0));
   const activeDeals = workingDeals.length;
-  const riskDeals = scenarioDeals.filter((deal) => deal.flags.negative).length;
+  const riskDeals = recognizedDeals.filter((deal) => deal.flags.negative).length;
   const remaining = Math.max(0, TOTAL_PLAN - actual);
   const leftDays = daysLeft();
   const neededPerDay = round1(remaining / leftDays);
-  const velocity = buildFactVelocity(scenarioDeals, historyRows);
+  const velocity = buildFactVelocity(recognizedDeals, historyRows);
   const risk = summarizeRisk(actual, realistic, optimistic);
 
   const summary = {
@@ -862,7 +868,7 @@ async function buildForecast() {
     totalDeals: createdAcademicPeriodDeals.length,
     warmDeals: scenarioDeals.length,
     allWarmDeals: scenarioDeals.length,
-    totalFunnels: new Set(preparedDeals.map((deal) => String(deal.categoryId))).size,
+    totalFunnels: new Set(includedDeals.map((deal) => String(deal.categoryId))).size,
     riskDeals,
     risk,
   };
@@ -906,8 +912,22 @@ async function buildForecast() {
       historyMode,
       factVelocityMode: velocity.mode,
       loadedDeals: preparedDeals.length,
+      includedDeals: includedDeals.length,
+      recognizedDeals: recognizedDeals.length,
       createdAcademicPeriodDeals: createdAcademicPeriodDeals.length,
       scenarioDeals: scenarioDeals.length,
+      byCategory: [...new Map(includedDeals.reduce((acc, deal) => {
+        const key = String(deal.categoryId);
+        const row = acc.get(key) || { categoryId: key, categoryName: deal.categoryName, count: 0 };
+        row.count += 1;
+        acc.set(key, row);
+        return acc;
+      }, new Map())).values()],
+      byStageKey: [...new Map(includedDeals.reduce((acc, deal) => {
+        const key = String(deal.stageKey || "unknown");
+        acc.set(key, Number(acc.get(key) || 0) + 1);
+        return acc;
+      }, new Map())).entries()].map(([stageKey, count]) => ({ stageKey, count })),
     },
     fields: {
       programField: PROGRAM_FIELD || null,
@@ -918,6 +938,8 @@ async function buildForecast() {
       method,
       academicPeriodStart: academicPeriod().start.toISOString().slice(0, 10),
       academicPeriodEnd: academicPeriod().end.toISOString().slice(0, 10),
+      dealLimit: DEAL_LIMIT,
+      dealLimitPerCategory: DEAL_LIMIT_PER_CATEGORY,
       snapshotsFile: SNAPSHOT_FILE,
     },
   };
