@@ -10,19 +10,6 @@ const INCLUDED_CATEGORY_IDS = String(process.env.ENROLLMENT_INCLUDE_CATEGORY_IDS
 const DEFAULT_ADMISSION_CATEGORY_IDS = ["33", "53", "63", "65", "67", "69", "73", "75", "77"];
 const TARGET_DATE = process.env.ENROLLMENT_TARGET_DATE || "2026-08-25";
 const TOTAL_PLAN = Number(process.env.ENROLLMENT_PLAN_TOTAL || 800);
-// By default DATE_MODIFY is NOT treated as communication.
-// DATE_MODIFY can change because of import, automation or system update and can falsely heat up old leads.
-const USE_DATE_MODIFY_AS_COMMUNICATION = String(process.env.ENROLLMENT_USE_DATE_MODIFY_AS_COMMUNICATION || "0") === "1";
-
-// Future lead forecast settings.
-// These defaults are deliberately conservative; tune them after 7-14 days of real KAU data.
-const NEW_LEAD_BASELINE_DAYS = Number(process.env.ENROLLMENT_NEW_LEAD_BASELINE_DAYS || 14);
-const NEW_LEAD_CONVERSION_CONSERVATIVE = Number(process.env.ENROLLMENT_NEW_LEAD_CONVERSION_CONSERVATIVE || 0.02);
-const NEW_LEAD_CONVERSION_REALISTIC = Number(process.env.ENROLLMENT_NEW_LEAD_CONVERSION_REALISTIC || 0.035);
-const NEW_LEAD_CONVERSION_OPTIMISTIC = Number(process.env.ENROLLMENT_NEW_LEAD_CONVERSION_OPTIMISTIC || 0.055);
-const NEW_LEAD_RANGE_LOW_MULTIPLIER = Number(process.env.ENROLLMENT_NEW_LEAD_RANGE_LOW_MULTIPLIER || 0.85);
-const NEW_LEAD_RANGE_HIGH_MULTIPLIER = Number(process.env.ENROLLMENT_NEW_LEAD_RANGE_HIGH_MULTIPLIER || 1.15);
-const FORECAST_ROUND_STEP = Number(process.env.ENROLLMENT_FORECAST_ROUND_STEP || 10);
 
 const PROGRAM_FIELD = process.env.ENROLLMENT_PROGRAM_FIELD || "";
 const LANG_FIELD = process.env.ENROLLMENT_LANG_FIELD || "";
@@ -41,10 +28,8 @@ const UTM_TERM_FIELD = process.env.ENROLLMENT_UTM_TERM_FIELD || "";
 
 const CACHE_SECONDS = Number(process.env.ENROLLMENT_FORECAST_CACHE_SECONDS || 3600);
 const BITRIX_TIMEOUT_MS = Number(process.env.BITRIX_TIMEOUT_MS || 15000);
-// Must be high enough to cover the full admissions base.
-// Previous defaults (900 / 100 per category) produced an incomplete forecast.
-const DEAL_LIMIT = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT || 100000);
-const DEAL_LIMIT_PER_CATEGORY = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT_PER_CATEGORY || 20000);
+const DEAL_LIMIT = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT || 900);
+const DEAL_LIMIT_PER_CATEGORY = Number(process.env.ENROLLMENT_FORECAST_DEAL_LIMIT_PER_CATEGORY || 100);
 const SNAPSHOT_DIR = path.join(__dirname, "data");
 const SNAPSHOT_FILE = path.join(SNAPSHOT_DIR, "enrollment-forecast-snapshots.json");
 
@@ -164,27 +149,6 @@ function pct(part, whole) {
   return round1((Number(part || 0) / Number(whole || 0)) * 100);
 }
 
-function roundTo(value, step = FORECAST_ROUND_STEP) {
-  const safeStep = Number(step || 1);
-  return Math.round(Number(value || 0) / safeStep) * safeStep;
-}
-
-function midpoint(range) {
-  return round1((Number(range?.low || 0) + Number(range?.high || 0)) / 2);
-}
-
-function formatApprox(value) {
-  return `~${roundTo(value)}`;
-}
-
-function formatPlusRange(range) {
-  return `+${roundTo(range.low)}–${roundTo(range.high)}`;
-}
-
-function formatRange(range) {
-  return `${roundTo(range.low)}–${roundTo(range.high)}`;
-}
-
 function parseDate(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -297,9 +261,6 @@ async function fetchDealCategories() {
   }
 
   if (!categoryMap.has(WARM_CATEGORY_ID)) categoryMap.set(WARM_CATEGORY_ID, "Теплая база");
-  for (const id of DEFAULT_ADMISSION_CATEGORY_IDS) {
-    if (!categoryMap.has(id)) categoryMap.set(id, `Воронка ${id}`);
-  }
   return categoryMap;
 }
 
@@ -324,7 +285,7 @@ async function fetchStageDictionary(categoryMap = new Map()) {
         for (const row of rows) {
           const id = row.STATUS_ID || row.ID;
           const name = row.NAME || row.STATUS_ID || row.ID;
-          if (id) map.set(String(id), name);
+          if (id) map.set(String(id), { name, semantics: row.SEMANTICS || row.semantics || "" });
         }
       } catch {}
     }
@@ -401,6 +362,39 @@ async function fetchDeals(categoryIds = []) {
   return { deals: deals.map(normalizeDealRecord), method: "crm.deal.list" };
 }
 
+async function fetchDealList(select, filter = {}, order = { ID: "DESC" }, maxItems = Infinity) {
+  const rows = [];
+  let start = 0;
+  while (rows.length < maxItems) {
+    const payload = await bitrix("crm.deal.list", {
+      order,
+      filter,
+      select,
+      start,
+    });
+    const chunk = Array.isArray(payload.result) ? payload.result : [];
+    if (!chunk.length) break;
+    rows.push(...chunk.slice(0, Math.max(0, maxItems - rows.length)));
+    if (typeof payload.next !== "number") break;
+    start = payload.next;
+  }
+  return rows;
+}
+
+async function fetchDealCount(filter = {}) {
+  const payload = await bitrix("crm.deal.list", {
+    order: { ID: "DESC" },
+    filter,
+    select: ["ID"],
+    start: 0,
+  });
+  if (typeof payload.total === "number") return payload.total;
+  const rows = Array.isArray(payload.result) ? payload.result : [];
+  if (typeof payload.next !== "number") return rows.length;
+  const all = await fetchDealList(["ID"], filter, { ID: "DESC" });
+  return all.length;
+}
+
 async function fetchUsers(ids) {
   const result = new Map();
   const uniqueIds = [...new Set((ids || []).filter(Boolean).map((id) => String(id)))];
@@ -442,7 +436,8 @@ function buildStageRuleMaps(stageDict) {
     for (const id of rule.ids || []) byId.set(id, rule);
     for (const alias of rule.aliases || []) byAlias.set(normalize(alias), rule);
   }
-  for (const [id, name] of stageDict.entries()) {
+  for (const [id, meta] of stageDict.entries()) {
+    const name = meta?.name || meta;
     const norm = normalize(name);
     if (byAlias.has(norm) && !byId.has(id)) byId.set(id, byAlias.get(norm));
   }
@@ -456,6 +451,40 @@ function detectRuleByStage(id, stageName, maps) {
     if (normName.includes(alias)) return rule;
   }
   return null;
+}
+
+function buildExactStageGroups(stageDict) {
+  const maps = buildStageRuleMaps(stageDict);
+  const groups = new Map();
+  const submittedStageIds = [];
+
+  for (const [stageId, meta] of stageDict.entries()) {
+    const stageName = meta?.name || meta || stageId;
+    const rule = detectRuleByStage(String(stageId), stageName, maps);
+    if (!rule) continue;
+
+    if (rule.key === "submitted") {
+      submittedStageIds.push(String(stageId));
+    }
+
+    if (rule.fact || rule.negative || rule.key === "unknown") continue;
+
+    const existing = groups.get(rule.key) || {
+      key: rule.key,
+      label: stageName,
+      stageIds: [],
+      conservative: Number(rule.conservative || 0),
+      realistic: Number(rule.realistic || 0),
+      optimistic: Number(rule.optimistic || 0),
+    };
+    existing.stageIds.push(String(stageId));
+    groups.set(rule.key, existing);
+  }
+
+  return {
+    submittedStageIds: [...new Set(submittedStageIds)],
+    workingGroups: [...groups.values()],
+  };
 }
 
 function detectProgram(deal) {
@@ -573,14 +602,10 @@ function normalizeDealRecord(deal) {
 }
 
 function getLastCommunication(deal) {
-  // Important: DATE_MODIFY is not a reliable communication date.
-  // It may change after import, automation, status sync, or mass update.
-  // Use an explicit Bitrix field for last call/message if you have it.
-  // Fallback to LAST_ACTIVITY_TIME only; use DATE_MODIFY only when explicitly enabled by env.
   return firstNonEmpty(
     LAST_COMM_FIELD ? deal[LAST_COMM_FIELD] : "",
     deal.LAST_ACTIVITY_TIME,
-    USE_DATE_MODIFY_AS_COMMUNICATION ? deal.DATE_MODIFY : "",
+    deal.DATE_MODIFY,
   );
 }
 
@@ -592,7 +617,9 @@ function prepareDeals(rawDeals, stageDict, managerNames, categoryMap = new Map()
   const maps = buildStageRuleMaps(stageDict);
   const prepared = [];
   for (const deal of rawDeals) {
-    const stageName = stageDict.get(deal.STAGE_ID) || deal.STAGE_ID || "Неизвестная стадия";
+    const stageMeta = stageDict.get(deal.STAGE_ID);
+    const stageName = stageMeta?.name || stageMeta || deal.STAGE_ID || "Неизвестная стадия";
+    const stageSemantics = String(stageMeta?.semantics || "").toUpperCase();
     const rule = detectRuleByStage(String(deal.STAGE_ID || ""), stageName, maps) || {
       key: "unknown",
       conservative: 0,
@@ -624,6 +651,7 @@ function prepareDeals(rawDeals, stageDict, managerNames, categoryMap = new Map()
       categoryName,
       stageId: String(deal.STAGE_ID || ""),
       stageName,
+      stageSemantics,
       stageKey: rule.key,
       sourceId: deal.SOURCE_ID || "",
       sourceDescription: deal.SOURCE_DESCRIPTION || "",
@@ -765,33 +793,93 @@ function buildByManager(deals) {
     .sort((a, b) => b.projected - a.projected);
 }
 
+function buildSubmittedByManager(deals) {
+  const totals = deals.reduce((acc, deal) => {
+    const key = deal.assignedByName || "Без ответственного";
+    const row = acc.get(key) || { manager: key, submitted: 0 };
+    row.submitted += 1;
+    acc.set(key, row);
+    return acc;
+  }, new Map());
+
+  return [...totals.values()].sort((a, b) => b.submitted - a.submitted || a.manager.localeCompare(b.manager, "ru"));
+}
+
+function ensureProgramBucket(base, programName) {
+  const key = String(programName || "").trim() || "РќРµ РѕРїСЂРµРґРµР»РµРЅРѕ";
+  if (!base.has(key)) {
+    const planRow = PROGRAM_PLANS.find((row) => normalize(row.program) === normalize(key));
+    base.set(key, {
+      program: key,
+      specialty: key,
+      plan: Number(planRow?.plan || 0),
+      actual: 0,
+      forecast: 0,
+      realistic: 0,
+      conservative: 0,
+      optimistic: 0,
+      langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 },
+    });
+  }
+  return base.get(key);
+}
+
+function detectProgram(deal) {
+  const direct = rawFieldValue(PROGRAM_FIELD ? deal[PROGRAM_FIELD] : "");
+  if (String(direct || "").trim()) {
+    const directNorm = normalize(direct);
+    for (const row of PROGRAM_PLANS) {
+      const planNorm = normalize(row.program);
+      if (directNorm === planNorm || directNorm.includes(planNorm) || planNorm.includes(directNorm)) return row.program;
+    }
+    return String(direct).trim();
+  }
+
+  const haystack = normalize([deal.TITLE, deal.SOURCE_DESCRIPTION].filter(Boolean).join(" "));
+  if (!haystack) return "РќРµ РѕРїСЂРµРґРµР»РµРЅРѕ";
+  for (const row of PROGRAM_PLANS) {
+    if (haystack.includes(normalize(row.program))) return row.program;
+  }
+  if (haystack.includes("РјРµР¶РґСѓРЅР°СЂРѕРґ") && haystack.includes("РѕС‚РЅРѕС€")) return "РњРµР¶РґСѓРЅР°СЂРѕРґРЅС‹Рµ РѕС‚РЅРѕС€РµРЅРёСЏ";
+  if (haystack.includes("РїРµСЂРµРІРѕРґ")) return "РџРµСЂРµРІРѕРґС‡РµСЃРєРѕРµ РґРµР»Рѕ";
+  if (haystack.includes("С‚СѓСЂРёР·Рј")) return "РўСѓСЂРёР·Рј";
+  if (haystack.includes("РїСЂРµРґРїСЂРёРЅРёРј")) return "РњРµР¶РґСѓРЅР°СЂРѕРґРЅС‹Р№ Р±РёР·РЅРµСЃ Рё РїСЂРµРґРїСЂРёРЅРёРјР°С‚РµР»СЊСЃС‚РІРѕ";
+  if (haystack.includes("Р¶СѓСЂРЅР°Р»РёСЃС‚")) return "Р–СѓСЂРЅР°Р»РёСЃС‚РёРєР°";
+  if (haystack.includes("С„РёРЅР°РЅСЃ")) return "Р¤РёРЅР°РЅСЃС‹";
+  if (haystack.includes("СЋСЂРёСЃ")) return "Р®СЂРёСЃРїСЂСѓРґРµРЅС†РёСЏ";
+  if (haystack.includes("РјР°СЂРєРµС‚")) return "Р¦РёС„СЂРѕРІРѕР№ РјР°СЂРєРµС‚РёРЅРі";
+  if (haystack.includes("Р°РЅР°Р»РёС‚")) return "Р‘РёР·РЅРµСЃ-Р°РЅР°Р»РёС‚РёРєР°";
+  if (haystack.includes("ai")) return "AI РІ Р±РёР·РЅРµСЃРµ Рё С‚РµС…РЅРѕР»РѕРіРёСЏС…";
+  return "РќРµ РѕРїСЂРµРґРµР»РµРЅРѕ";
+}
+
 function buildBySpecialty(deals) {
   const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { specialty: row.program, plan: row.plan, actual: 0, forecast: 0 }]));
-  if (!base.has("Не указано")) base.set("Не указано", { specialty: "Не указано", plan: 0, actual: 0, forecast: 0 });
+  if (!base.has("Не определено")) base.set("Не определено", { specialty: "Не определено", plan: 0, actual: 0, forecast: 0 });
   for (const deal of deals) {
-    const row = base.get(deal.program) || base.get("Не указано");
-    if (deal.flags.fact) row.actual += 1;
-    row.forecast += deal.probability.realistic;
+    const row = base.get(deal.program) || base.get("Не определено");
+    row.actual += 1;
+    row.forecast += 1;
   }
-  const totalForecast = deals.reduce((sum, deal) => sum + deal.probability.realistic, 0) || 1;
+  const totalActual = deals.length || 1;
   return [...base.values()]
     .filter((row) => row.plan > 0 || row.actual > 0 || row.forecast > 0)
     .map((row) => ({
       specialty: row.specialty,
       plan: row.plan,
       actual: row.actual,
-      forecast: round1(row.forecast),
-      delta: round1(row.forecast - row.plan),
-      share: pct(row.forecast, totalForecast),
+      forecast: row.actual,
+      delta: round1(row.actual - row.plan),
+      share: pct(row.actual, totalActual),
     }))
-    .sort((a, b) => b.forecast - a.forecast);
+    .sort((a, b) => b.actual - a.actual);
 }
 
 function buildProgramRows(deals) {
   const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { ...row, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } }]));
-  if (!base.has("Не указано")) base.set("Не указано", { program: "Не указано", plan: 0, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } });
+  if (!base.has("Не определено")) base.set("Не определено", { program: "Не определено", plan: 0, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } });
   for (const deal of deals) {
-    const row = base.get(deal.program) || base.get("Не указано");
+    const row = base.get(deal.program) || base.get("Не определено");
     if (deal.flags.fact) row.actual += 1;
     row.realistic += deal.probability.realistic;
     row.conservative += deal.probability.conservative;
@@ -809,6 +897,88 @@ function buildProgramRows(deals) {
       progress: pct(row.actual, row.plan),
     }))
     .sort((a, b) => b.realistic - a.realistic);
+}
+
+function buildSubmittedProgramRows(deals) {
+  const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { ...row, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } }]));
+  if (!base.has("Не определено")) base.set("Не определено", { program: "Не определено", plan: 0, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } });
+  for (const deal of deals) {
+    const row = base.get(deal.program) || base.get("Не определено");
+    row.actual += 1;
+    row.realistic += 1;
+    row.conservative += 1;
+    row.optimistic += 1;
+    row.langs[deal.language] = Number(row.langs[deal.language] || 0) + 1;
+  }
+  return [...base.values()]
+    .filter((row) => row.plan > 0 || row.actual > 0)
+    .map((row) => ({
+      ...row,
+      realistic: row.actual,
+      conservative: row.actual,
+      optimistic: row.actual,
+      remaining: Math.max(0, Number(row.plan || 0) - Number(row.actual || 0)),
+      progress: pct(row.actual, row.plan),
+    }))
+    .sort((a, b) => b.actual - a.actual);
+}
+
+function buildBySpecialty(actualDeals, forecastDeals) {
+  const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { specialty: row.program, plan: row.plan, actual: 0, forecast: 0 }]));
+  ensureProgramBucket(base, "РќРµ РѕРїСЂРµРґРµР»РµРЅРѕ");
+
+  for (const deal of actualDeals) {
+    const row = ensureProgramBucket(base, deal.program);
+    row.actual += 1;
+  }
+
+  for (const deal of forecastDeals) {
+    const row = ensureProgramBucket(base, deal.program);
+    row.forecast += Number(deal.probability?.realistic || 0);
+  }
+
+  const totalForecast = forecastDeals.reduce((sum, deal) => sum + Number(deal.probability?.realistic || 0), 0) || 1;
+  return [...base.values()]
+    .filter((row) => row.plan > 0 || row.actual > 0 || row.forecast > 0)
+    .map((row) => ({
+      specialty: row.specialty,
+      plan: row.plan,
+      actual: row.actual,
+      forecast: round1(row.forecast),
+      delta: round1(row.forecast - row.plan),
+      share: pct(row.forecast, totalForecast),
+    }))
+    .sort((a, b) => b.forecast - a.forecast || b.actual - a.actual);
+}
+
+function buildProgramRows(actualDeals, forecastDeals) {
+  const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { ...row, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } }]));
+  ensureProgramBucket(base, "РќРµ РѕРїСЂРµРґРµР»РµРЅРѕ");
+
+  for (const deal of actualDeals) {
+    const row = ensureProgramBucket(base, deal.program);
+    if (deal.flags.fact) row.actual += 1;
+  }
+
+  for (const deal of forecastDeals) {
+    const row = ensureProgramBucket(base, deal.program);
+    row.realistic += Number(deal.probability?.realistic || 0);
+    row.conservative += Number(deal.probability?.conservative || 0);
+    row.optimistic += Number(deal.probability?.optimistic || 0);
+    row.langs[deal.language] = Number(row.langs[deal.language] || 0) + 1;
+  }
+
+  return [...base.values()]
+    .filter((row) => row.plan > 0 || row.actual > 0 || row.realistic > 0)
+    .map((row) => ({
+      ...row,
+      realistic: round1(row.realistic),
+      conservative: round1(row.conservative),
+      optimistic: round1(row.optimistic),
+      remaining: Math.max(0, Number(row.plan || 0) - Number(row.actual || 0)),
+      progress: pct(row.actual, row.plan),
+    }))
+    .sort((a, b) => b.realistic - a.realistic || b.actual - a.actual);
 }
 
 function buildRisks(deals) {
@@ -875,88 +1045,6 @@ function buildFactVelocity(deals, historyRows) {
   };
 }
 
-
-function buildNewLeadProjection(deals, leftDays) {
-  const baselineDays = Math.max(1, Number(NEW_LEAD_BASELINE_DAYS || 14));
-  const since = new Date(Date.now() - baselineDays * 86400000);
-  const recentCreatedDeals = deals.filter((deal) => {
-    if (deal.flags.fact || deal.flags.negative) return false;
-    const created = parseDate(deal.dateCreate);
-    return created && created >= since;
-  });
-
-  const averageNewDealsPerDay = recentCreatedDeals.length / baselineDays;
-  const projectedNewDealsVolume = averageNewDealsPerDay * Math.max(0, leftDays);
-  const conversion = {
-    conservative: clipProbability(NEW_LEAD_CONVERSION_CONSERVATIVE),
-    realistic: clipProbability(NEW_LEAD_CONVERSION_REALISTIC),
-    optimistic: clipProbability(NEW_LEAD_CONVERSION_OPTIMISTIC),
-  };
-
-  const scenarios = {};
-  for (const key of ["conservative", "realistic", "optimistic"]) {
-    const base = projectedNewDealsVolume * conversion[key];
-    scenarios[key] = {
-      low: round1(base * NEW_LEAD_RANGE_LOW_MULTIPLIER),
-      high: round1(base * NEW_LEAD_RANGE_HIGH_MULTIPLIER),
-      midpoint: round1(base),
-      conversion: conversion[key],
-    };
-  }
-
-  return {
-    baselineDays,
-    recentCreatedDeals: recentCreatedDeals.length,
-    averageNewDealsPerDay: round2(averageNewDealsPerDay),
-    projectedNewDealsVolume: round1(projectedNewDealsVolume),
-    scenarios,
-  };
-}
-
-function buildScenarioForecasts(currentBase, newLeadProjection) {
-  const result = {};
-  for (const key of ["conservative", "realistic", "optimistic"]) {
-    const current = Number(currentBase[key] || 0);
-    const newLeads = newLeadProjection.scenarios[key];
-    const total = {
-      low: round1(current + newLeads.low),
-      high: round1(current + newLeads.high),
-      midpoint: round1(current + midpoint(newLeads)),
-    };
-    result[key] = {
-      currentBase: round1(current),
-      newLeads,
-      total,
-      progress: pct(total.midpoint, TOTAL_PLAN),
-      remaining: Math.max(0, round1(TOTAL_PLAN - total.midpoint)),
-    };
-  }
-  return result;
-}
-
-function buildForecastTable(scenarios) {
-  const labels = {
-    conservative: "Осторожный",
-    realistic: "Реалистичный",
-    optimistic: "Оптимистичный",
-  };
-
-  return ["conservative", "realistic", "optimistic"].map((key) => ({
-    scenario: labels[key],
-    currentBaseForecast: formatApprox(scenarios[key].currentBase),
-    newLeadsToTarget: formatPlusRange(scenarios[key].newLeads),
-    finalForecast: formatRange(scenarios[key].total),
-    value: round1(scenarios[key].total.midpoint),
-    planGap: round1(scenarios[key].total.midpoint - TOTAL_PLAN),
-    progress: scenarios[key].progress,
-  }));
-}
-
-function buildForecastStatement(scenarios, neededPerDay) {
-  const realistic = scenarios.realistic.total;
-  return `Мой рабочий прогноз по всей базе: ${formatRange(realistic)} студентов. План ${TOTAL_PLAN} рядом, но сам не придет: нужно держать темп ${Math.ceil(neededPerDay)}–${Math.ceil(neededPerDay + 1)} сдач документов в день.`;
-}
-
 function readSnapshots() {
   try {
     if (!fs.existsSync(SNAPSHOT_FILE)) return [];
@@ -983,36 +1071,67 @@ async function buildForecast() {
   const categoryMap = await fetchDealCategories();
   const stageDict = await fetchStageDictionary(categoryMap);
   const categoryIds = resolveIncludedCategoryIds(categoryMap);
-  const { deals: rawDeals, method } = await fetchDeals(categoryIds);
-  const managerNames = await fetchUsers(rawDeals.map((deal) => deal.ASSIGNED_BY_ID));
-  const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
   const { rows: historyRows, mode: historyMode } = await fetchStageHistory();
+  const exactGroups = buildExactStageGroups(stageDict);
+  const submittedSelect = [...new Set([...STANDARD_FIELDS, ...getEnvFields()])];
+  const submittedRawDeals = exactGroups.submittedStageIds.length
+    ? await fetchDealList(submittedSelect, {
+        "=CATEGORY_ID": Number(WARM_CATEGORY_ID),
+        "@STAGE_ID": exactGroups.submittedStageIds,
+      })
+    : [];
 
-  const includedDeals = preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)));
-  const createdAcademicPeriodDeals = includedDeals.filter((deal) => isWithinAcademicPeriod(pickAcademicAnchorDate(deal)));
-  const recognizedDeals = includedDeals.filter((deal) => deal.stageKey !== "unknown");
-  // Forecast is calculated across the whole recognized admissions base.
-  // Negative stages are not excluded: they have low/zero probabilities and still affect risk/stage tables.
-  const scenarioDeals = recognizedDeals;
-  const factDeals = recognizedDeals.filter((deal) => deal.flags.fact);
-  const workingDeals = scenarioDeals.filter((deal) => !deal.flags.fact);
+  const { deals: rawDeals, method } = await fetchDeals(categoryIds);
+  const managerNames = await fetchUsers([
+    ...rawDeals.map((deal) => deal.ASSIGNED_BY_ID),
+    ...submittedRawDeals.map((deal) => deal.ASSIGNED_BY_ID),
+  ]);
+  const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
+  const submittedWarmDeals = prepareDeals(
+    submittedRawDeals.map(normalizeDealRecord),
+    stageDict,
+    managerNames,
+    categoryMap,
+  ).filter((deal) => String(deal.categoryId) === String(WARM_CATEGORY_ID) && deal.stageKey === "submitted");
 
-  const actual = factDeals.length;
-  const conservative = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.conservative, 0));
-  const realistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.realistic, 0));
-  const optimistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.optimistic, 0));
-  const currentBaseForecast = { conservative, realistic, optimistic };
-  const activeDeals = workingDeals.length;
-  const riskDeals = recognizedDeals.filter((deal) => deal.flags.negative).length;
+  const stageCounts = [];
+  for (const group of exactGroups.workingGroups) {
+    const count = group.stageIds.length
+      ? await fetchDealCount({
+          "@CATEGORY_ID": categoryIds.map((id) => Number(id)),
+          "@STAGE_ID": group.stageIds,
+        })
+      : 0;
+    stageCounts.push({
+      stage: group.label,
+      count,
+      avgProbability: round2(group.realistic),
+      forecastContribution: round1(count * group.realistic),
+      forecastShare: 0,
+      conservativeContribution: round1(count * group.conservative),
+      optimisticContribution: round1(count * group.optimistic),
+    });
+  }
+
+  const totalForecastRealistic = stageCounts.reduce((sum, row) => sum + row.forecastContribution, 0) || 1;
+  const byStage = stageCounts
+    .map((row) => ({
+      ...row,
+      forecastShare: pct(row.forecastContribution, totalForecastRealistic),
+    }))
+    .sort((a, b) => b.forecastContribution - a.forecastContribution);
+
+  const actual = submittedWarmDeals.length;
+  const conservative = round1(stageCounts.reduce((sum, row) => sum + row.conservativeContribution, 0));
+  const realistic = round1(stageCounts.reduce((sum, row) => sum + row.forecastContribution, 0));
+  const optimistic = round1(stageCounts.reduce((sum, row) => sum + row.optimisticContribution, 0));
+  const activeDeals = stageCounts.reduce((sum, row) => sum + row.count, 0);
+  const riskDeals = 0;
   const remaining = Math.max(0, TOTAL_PLAN - actual);
   const leftDays = daysLeft();
   const neededPerDay = round1(remaining / leftDays);
-  const velocity = buildFactVelocity(recognizedDeals, historyRows);
-  const newLeadProjection = buildNewLeadProjection(scenarioDeals, leftDays);
-  const forecastScenarios = buildScenarioForecasts(currentBaseForecast, newLeadProjection);
-  const forecastTable = buildForecastTable(forecastScenarios);
-  const forecastStatement = buildForecastStatement(forecastScenarios, neededPerDay);
-  const risk = summarizeRisk(actual, forecastScenarios.realistic.total.midpoint, forecastScenarios.optimistic.total.midpoint);
+  const velocity = buildFactVelocity(submittedWarmDeals, historyRows);
+  const risk = summarizeRisk(actual, realistic, optimistic);
 
   const summary = {
     plan: TOTAL_PLAN,
@@ -1025,39 +1144,24 @@ async function buildForecast() {
     neededPerDay,
     daysLeft: leftDays,
     activeDeals,
-    totalDeals: createdAcademicPeriodDeals.length,
-    warmDeals: scenarioDeals.length,
-    allWarmDeals: scenarioDeals.length,
-    totalFunnels: new Set(includedDeals.map((deal) => String(deal.categoryId))).size,
+    totalDeals: activeDeals,
+    warmDeals: submittedWarmDeals.length,
+    allWarmDeals: activeDeals,
+    totalFunnels: categoryIds.length,
     riskDeals,
     risk,
-    currentBaseForecast,
-    newLeadProjection,
-    totalForecast: {
-      conservative: forecastScenarios.conservative.total,
-      realistic: forecastScenarios.realistic.total,
-      optimistic: forecastScenarios.optimistic.total,
-    },
-    workingForecast: forecastScenarios.realistic.total,
-    forecastStatement,
   };
 
   const snapshotEntry = {
     date: new Date().toISOString().slice(0, 10),
     createdAt: new Date().toISOString(),
     fact: actual,
-    currentBaseConservative: conservative,
-    currentBaseRealistic: realistic,
-    currentBaseOptimistic: optimistic,
-    conservative: forecastScenarios.conservative.total.midpoint,
-    realistic: forecastScenarios.realistic.total.midpoint,
-    optimistic: forecastScenarios.optimistic.total.midpoint,
-    newLeadsConservative: forecastScenarios.conservative.newLeads.midpoint,
-    newLeadsRealistic: forecastScenarios.realistic.newLeads.midpoint,
-    newLeadsOptimistic: forecastScenarios.optimistic.newLeads.midpoint,
+    conservative,
+    realistic,
+    optimistic,
     todaySubmissions: velocity.today,
     last7dSubmissions: velocity.last7d,
-    stageCounts: buildByStage(scenarioDeals).map((row) => ({ stage: row.stage, count: row.count })),
+    stageCounts: byStage.map((row) => ({ stage: row.stage, count: row.count })),
   };
   const snapshots = writeSnapshot(snapshotEntry);
 
@@ -1071,65 +1175,39 @@ async function buildForecast() {
     targetDate: TARGET_DATE,
     fetchedAt: new Date().toISOString(),
     summary,
-    forecastTable,
-    forecastStatement,
-    currentBaseForecast,
-    newLeadProjection,
     scenarios: {
-      conservative: {
-        label: "Осторожный",
-        value: forecastScenarios.conservative.total.midpoint,
-        currentBase: forecastScenarios.conservative.currentBase,
-        newLeads: forecastScenarios.conservative.newLeads,
-        total: forecastScenarios.conservative.total,
-        progress: forecastScenarios.conservative.progress,
-        remaining: forecastScenarios.conservative.remaining,
-      },
-      realistic: {
-        label: "Реалистичный",
-        value: forecastScenarios.realistic.total.midpoint,
-        currentBase: forecastScenarios.realistic.currentBase,
-        newLeads: forecastScenarios.realistic.newLeads,
-        total: forecastScenarios.realistic.total,
-        progress: forecastScenarios.realistic.progress,
-        remaining: forecastScenarios.realistic.remaining,
-      },
-      optimistic: {
-        label: "Оптимистичный",
-        value: forecastScenarios.optimistic.total.midpoint,
-        currentBase: forecastScenarios.optimistic.currentBase,
-        newLeads: forecastScenarios.optimistic.newLeads,
-        total: forecastScenarios.optimistic.total,
-        progress: forecastScenarios.optimistic.progress,
-        remaining: forecastScenarios.optimistic.remaining,
-      },
+      conservative: { label: "Осторожный", value: conservative, progress: pct(conservative, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - conservative) },
+      realistic: { label: "Реалистичный", value: realistic, progress: pct(realistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - realistic) },
+      optimistic: { label: "Оптимистичный", value: optimistic, progress: pct(optimistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - optimistic) },
     },
-    byStage: buildByStage(scenarioDeals),
-    bySource: buildBySource(scenarioDeals),
-    managers: buildByManager(scenarioDeals),
-    risks: buildRisks(scenarioDeals),
-    bySpecialty: buildBySpecialty(scenarioDeals),
-    byProgram: buildProgramRows(scenarioDeals),
+    byStage,
+    bySource: [],
+    managers: buildSubmittedByManager(submittedWarmDeals),
+    risks: [],
+    bySpecialty: buildBySpecialty(submittedWarmDeals, preparedDeals),
+    byProgram: buildProgramRows(submittedWarmDeals, preparedDeals),
     history: snapshots,
     debug: {
       historyMode,
       factVelocityMode: velocity.mode,
       loadedDeals: preparedDeals.length,
-      includedDeals: includedDeals.length,
-      recognizedDeals: recognizedDeals.length,
-      dealsWithDateCreate: includedDeals.filter((deal) => Boolean(deal.dateCreate)).length,
-      dealsWithDateModify: includedDeals.filter((deal) => Boolean(deal.dateModify)).length,
-      dealsWithLastCommunication: includedDeals.filter((deal) => Boolean(deal.lastCommunication)).length,
-      createdAcademicPeriodDeals: createdAcademicPeriodDeals.length,
-      scenarioDeals: scenarioDeals.length,
-      byCategory: [...new Map(includedDeals.reduce((acc, deal) => {
+      includedDeals: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId))).length,
+      submittedWarmDeals: submittedWarmDeals.length,
+      workingDealsAll: activeDeals,
+      recognizedDeals: activeDeals,
+      dealsWithDateCreate: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)) && Boolean(deal.dateCreate)).length,
+      dealsWithDateModify: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)) && Boolean(deal.dateModify)).length,
+      dealsWithLastCommunication: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)) && Boolean(deal.lastCommunication)).length,
+      createdAcademicPeriodDeals: 0,
+      scenarioDeals: activeDeals,
+      byCategory: [...new Map(preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId))).reduce((acc, deal) => {
         const key = String(deal.categoryId);
         const row = acc.get(key) || { categoryId: key, categoryName: deal.categoryName, count: 0 };
         row.count += 1;
         acc.set(key, row);
         return acc;
       }, new Map())).values()],
-      byStageKey: [...new Map(includedDeals.reduce((acc, deal) => {
+      byStageKey: [...new Map(preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId))).reduce((acc, deal) => {
         const key = String(deal.stageKey || "unknown");
         acc.set(key, Number(acc.get(key) || 0) + 1);
         return acc;
@@ -1146,13 +1224,6 @@ async function buildForecast() {
       academicPeriodEnd: academicPeriod().end.toISOString().slice(0, 10),
       dealLimit: DEAL_LIMIT,
       dealLimitPerCategory: DEAL_LIMIT_PER_CATEGORY,
-      useDateModifyAsCommunication: USE_DATE_MODIFY_AS_COMMUNICATION,
-      newLeadBaselineDays: NEW_LEAD_BASELINE_DAYS,
-      newLeadConversion: {
-        conservative: NEW_LEAD_CONVERSION_CONSERVATIVE,
-        realistic: NEW_LEAD_CONVERSION_REALISTIC,
-        optimistic: NEW_LEAD_CONVERSION_OPTIMISTIC,
-      },
       snapshotsFile: SNAPSHOT_FILE,
     },
   };
