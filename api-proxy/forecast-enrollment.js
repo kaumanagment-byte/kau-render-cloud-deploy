@@ -362,6 +362,39 @@ async function fetchDeals(categoryIds = []) {
   return { deals: deals.map(normalizeDealRecord), method: "crm.deal.list" };
 }
 
+async function fetchDealList(select, filter = {}, order = { ID: "DESC" }, maxItems = Infinity) {
+  const rows = [];
+  let start = 0;
+  while (rows.length < maxItems) {
+    const payload = await bitrix("crm.deal.list", {
+      order,
+      filter,
+      select,
+      start,
+    });
+    const chunk = Array.isArray(payload.result) ? payload.result : [];
+    if (!chunk.length) break;
+    rows.push(...chunk.slice(0, Math.max(0, maxItems - rows.length)));
+    if (typeof payload.next !== "number") break;
+    start = payload.next;
+  }
+  return rows;
+}
+
+async function fetchDealCount(filter = {}) {
+  const payload = await bitrix("crm.deal.list", {
+    order: { ID: "DESC" },
+    filter,
+    select: ["ID"],
+    start: 0,
+  });
+  if (typeof payload.total === "number") return payload.total;
+  const rows = Array.isArray(payload.result) ? payload.result : [];
+  if (typeof payload.next !== "number") return rows.length;
+  const all = await fetchDealList(["ID"], filter, { ID: "DESC" });
+  return all.length;
+}
+
 async function fetchUsers(ids) {
   const result = new Map();
   const uniqueIds = [...new Set((ids || []).filter(Boolean).map((id) => String(id)))];
@@ -418,6 +451,40 @@ function detectRuleByStage(id, stageName, maps) {
     if (normName.includes(alias)) return rule;
   }
   return null;
+}
+
+function buildExactStageGroups(stageDict) {
+  const maps = buildStageRuleMaps(stageDict);
+  const groups = new Map();
+  const submittedStageIds = [];
+
+  for (const [stageId, meta] of stageDict.entries()) {
+    const stageName = meta?.name || meta || stageId;
+    const rule = detectRuleByStage(String(stageId), stageName, maps);
+    if (!rule) continue;
+
+    if (rule.key === "submitted") {
+      submittedStageIds.push(String(stageId));
+    }
+
+    if (rule.fact || rule.negative || rule.key === "unknown") continue;
+
+    const existing = groups.get(rule.key) || {
+      key: rule.key,
+      label: stageName,
+      stageIds: [],
+      conservative: Number(rule.conservative || 0),
+      realistic: Number(rule.realistic || 0),
+      optimistic: Number(rule.optimistic || 0),
+    };
+    existing.stageIds.push(String(stageId));
+    groups.set(rule.key, existing);
+  }
+
+  return {
+    submittedStageIds: [...new Set(submittedStageIds)],
+    workingGroups: [...groups.values()],
+  };
 }
 
 function detectProgram(deal) {
@@ -551,7 +618,7 @@ function prepareDeals(rawDeals, stageDict, managerNames, categoryMap = new Map()
   const prepared = [];
   for (const deal of rawDeals) {
     const stageMeta = stageDict.get(deal.STAGE_ID);
-    const stageName = stageMeta?.name || stageMeta || deal.STAGE_ID || "??????????? ??????";
+    const stageName = stageMeta?.name || stageMeta || deal.STAGE_ID || "Неизвестная стадия";
     const stageSemantics = String(stageMeta?.semantics || "").toUpperCase();
     const rule = detectRuleByStage(String(deal.STAGE_ID || ""), stageName, maps) || {
       key: "unknown",
@@ -728,7 +795,7 @@ function buildByManager(deals) {
 
 function buildSubmittedByManager(deals) {
   const totals = deals.reduce((acc, deal) => {
-    const key = deal.assignedByName || "No owner??";
+    const key = deal.assignedByName || "Без ответственного";
     const row = acc.get(key) || { manager: key, submitted: 0 };
     row.submitted += 1;
     acc.set(key, row);
@@ -740,9 +807,9 @@ function buildSubmittedByManager(deals) {
 
 function buildBySpecialty(deals) {
   const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { specialty: row.program, plan: row.plan, actual: 0, forecast: 0 }]));
-  if (!base.has("Unknown")) base.set("Unknown", { specialty: "Unknown", plan: 0, actual: 0, forecast: 0 });
+  if (!base.has("Не определено")) base.set("Не определено", { specialty: "Не определено", plan: 0, actual: 0, forecast: 0 });
   for (const deal of deals) {
-    const row = base.get(deal.program) || base.get("Unknown");
+    const row = base.get(deal.program) || base.get("Не определено");
     row.actual += 1;
     row.forecast += 1;
   }
@@ -762,9 +829,9 @@ function buildBySpecialty(deals) {
 
 function buildProgramRows(deals) {
   const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { ...row, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } }]));
-  if (!base.has("Unknown")) base.set("Unknown", { program: "Unknown", plan: 0, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } });
+  if (!base.has("Не определено")) base.set("Не определено", { program: "Не определено", plan: 0, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } });
   for (const deal of deals) {
-    const row = base.get(deal.program) || base.get("Unknown");
+    const row = base.get(deal.program) || base.get("Не определено");
     if (deal.flags.fact) row.actual += 1;
     row.realistic += deal.probability.realistic;
     row.conservative += deal.probability.conservative;
@@ -786,9 +853,9 @@ function buildProgramRows(deals) {
 
 function buildSubmittedProgramRows(deals) {
   const base = new Map(PROGRAM_PLANS.map((row) => [row.program, { ...row, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } }]));
-  if (!base.has("Unknown")) base.set("Unknown", { program: "Unknown", plan: 0, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } });
+  if (!base.has("Не определено")) base.set("Не определено", { program: "Не определено", plan: 0, actual: 0, realistic: 0, conservative: 0, optimistic: 0, langs: { kaz: 0, rus: 0, eng: 0, unknown: 0 } });
   for (const deal of deals) {
-    const row = base.get(deal.program) || base.get("Unknown");
+    const row = base.get(deal.program) || base.get("Не определено");
     row.actual += 1;
     row.realistic += 1;
     row.conservative += 1;
@@ -898,23 +965,62 @@ async function buildForecast() {
   const categoryMap = await fetchDealCategories();
   const stageDict = await fetchStageDictionary(categoryMap);
   const categoryIds = resolveIncludedCategoryIds(categoryMap);
-  const { deals: rawDeals, method } = await fetchDeals(categoryIds);
-  const managerNames = await fetchUsers(rawDeals.map((deal) => deal.ASSIGNED_BY_ID));
-  const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
   const { rows: historyRows, mode: historyMode } = await fetchStageHistory();
+  const exactGroups = buildExactStageGroups(stageDict);
+  const submittedSelect = [...new Set([...STANDARD_FIELDS, ...getEnvFields()])];
+  const submittedRawDeals = exactGroups.submittedStageIds.length
+    ? await fetchDealList(submittedSelect, {
+        "=CATEGORY_ID": Number(WARM_CATEGORY_ID),
+        "@STAGE_ID": exactGroups.submittedStageIds,
+      })
+    : [];
 
-  const includedDeals = preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)));
-  const submittedWarmDeals = includedDeals.filter((deal) => String(deal.categoryId) === String(WARM_CATEGORY_ID) && deal.stageKey === "submitted");
-  const workingDealsAll = includedDeals.filter((deal) => ["P", "PROCESS"].includes(String(deal.stageSemantics || "").toUpperCase()));
-  const recognizedDeals = workingDealsAll.filter((deal) => deal.stageKey !== "unknown");
-  const scenarioDeals = recognizedDeals.filter((deal) => !deal.flags.negative);
+  const { deals: rawDeals, method } = await fetchDeals(categoryIds);
+  const managerNames = await fetchUsers([
+    ...rawDeals.map((deal) => deal.ASSIGNED_BY_ID),
+    ...submittedRawDeals.map((deal) => deal.ASSIGNED_BY_ID),
+  ]);
+  const preparedDeals = prepareDeals(rawDeals, stageDict, managerNames, categoryMap);
+  const submittedWarmDeals = prepareDeals(
+    submittedRawDeals.map(normalizeDealRecord),
+    stageDict,
+    managerNames,
+    categoryMap,
+  ).filter((deal) => String(deal.categoryId) === String(WARM_CATEGORY_ID) && deal.stageKey === "submitted");
+
+  const stageCounts = [];
+  for (const group of exactGroups.workingGroups) {
+    const count = group.stageIds.length
+      ? await fetchDealCount({
+          "@CATEGORY_ID": categoryIds.map((id) => Number(id)),
+          "@STAGE_ID": group.stageIds,
+        })
+      : 0;
+    stageCounts.push({
+      stage: group.label,
+      count,
+      avgProbability: round2(group.realistic),
+      forecastContribution: round1(count * group.realistic),
+      forecastShare: 0,
+      conservativeContribution: round1(count * group.conservative),
+      optimisticContribution: round1(count * group.optimistic),
+    });
+  }
+
+  const totalForecastRealistic = stageCounts.reduce((sum, row) => sum + row.forecastContribution, 0) || 1;
+  const byStage = stageCounts
+    .map((row) => ({
+      ...row,
+      forecastShare: pct(row.forecastContribution, totalForecastRealistic),
+    }))
+    .sort((a, b) => b.forecastContribution - a.forecastContribution);
 
   const actual = submittedWarmDeals.length;
-  const conservative = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.conservative, 0));
-  const realistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.realistic, 0));
-  const optimistic = round1(scenarioDeals.reduce((sum, deal) => sum + deal.probability.optimistic, 0));
-  const activeDeals = workingDealsAll.length;
-  const riskDeals = workingDealsAll.filter((deal) => deal.flags.negative).length;
+  const conservative = round1(stageCounts.reduce((sum, row) => sum + row.conservativeContribution, 0));
+  const realistic = round1(stageCounts.reduce((sum, row) => sum + row.forecastContribution, 0));
+  const optimistic = round1(stageCounts.reduce((sum, row) => sum + row.optimisticContribution, 0));
+  const activeDeals = stageCounts.reduce((sum, row) => sum + row.count, 0);
+  const riskDeals = 0;
   const remaining = Math.max(0, TOTAL_PLAN - actual);
   const leftDays = daysLeft();
   const neededPerDay = round1(remaining / leftDays);
@@ -932,10 +1038,10 @@ async function buildForecast() {
     neededPerDay,
     daysLeft: leftDays,
     activeDeals,
-    totalDeals: workingDealsAll.length,
+    totalDeals: activeDeals,
     warmDeals: submittedWarmDeals.length,
-    allWarmDeals: workingDealsAll.length,
-    totalFunnels: new Set(includedDeals.map((deal) => String(deal.categoryId))).size,
+    allWarmDeals: activeDeals,
+    totalFunnels: categoryIds.length,
     riskDeals,
     risk,
   };
@@ -949,7 +1055,7 @@ async function buildForecast() {
     optimistic,
     todaySubmissions: velocity.today,
     last7dSubmissions: velocity.last7d,
-    stageCounts: buildByStage(scenarioDeals).map((row) => ({ stage: row.stage, count: row.count })),
+    stageCounts: byStage.map((row) => ({ stage: row.stage, count: row.count })),
   };
   const snapshots = writeSnapshot(snapshotEntry);
 
@@ -968,10 +1074,10 @@ async function buildForecast() {
       realistic: { label: "Реалистичный", value: realistic, progress: pct(realistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - realistic) },
       optimistic: { label: "Оптимистичный", value: optimistic, progress: pct(optimistic, TOTAL_PLAN), remaining: Math.max(0, TOTAL_PLAN - optimistic) },
     },
-    byStage: buildByStage(scenarioDeals),
-    bySource: buildBySource(scenarioDeals),
+    byStage,
+    bySource: [],
     managers: buildSubmittedByManager(submittedWarmDeals),
-    risks: buildRisks(scenarioDeals),
+    risks: [],
     bySpecialty: buildBySpecialty(submittedWarmDeals),
     byProgram: buildSubmittedProgramRows(submittedWarmDeals),
     history: snapshots,
@@ -979,23 +1085,23 @@ async function buildForecast() {
       historyMode,
       factVelocityMode: velocity.mode,
       loadedDeals: preparedDeals.length,
-      includedDeals: includedDeals.length,
+      includedDeals: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId))).length,
       submittedWarmDeals: submittedWarmDeals.length,
-      workingDealsAll: workingDealsAll.length,
-      recognizedDeals: recognizedDeals.length,
-      dealsWithDateCreate: includedDeals.filter((deal) => Boolean(deal.dateCreate)).length,
-      dealsWithDateModify: includedDeals.filter((deal) => Boolean(deal.dateModify)).length,
-      dealsWithLastCommunication: includedDeals.filter((deal) => Boolean(deal.lastCommunication)).length,
+      workingDealsAll: activeDeals,
+      recognizedDeals: activeDeals,
+      dealsWithDateCreate: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)) && Boolean(deal.dateCreate)).length,
+      dealsWithDateModify: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)) && Boolean(deal.dateModify)).length,
+      dealsWithLastCommunication: preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId)) && Boolean(deal.lastCommunication)).length,
       createdAcademicPeriodDeals: 0,
-      scenarioDeals: scenarioDeals.length,
-      byCategory: [...new Map(includedDeals.reduce((acc, deal) => {
+      scenarioDeals: activeDeals,
+      byCategory: [...new Map(preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId))).reduce((acc, deal) => {
         const key = String(deal.categoryId);
         const row = acc.get(key) || { categoryId: key, categoryName: deal.categoryName, count: 0 };
         row.count += 1;
         acc.set(key, row);
         return acc;
       }, new Map())).values()],
-      byStageKey: [...new Map(includedDeals.reduce((acc, deal) => {
+      byStageKey: [...new Map(preparedDeals.filter((deal) => categoryIds.includes(String(deal.categoryId))).reduce((acc, deal) => {
         const key = String(deal.stageKey || "unknown");
         acc.set(key, Number(acc.get(key) || 0) + 1);
         return acc;
