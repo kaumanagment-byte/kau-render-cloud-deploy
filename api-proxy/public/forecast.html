@@ -111,20 +111,20 @@
 
     <section class="grid">
       <article class="panel">
-        <div class="panel-head"><div><p class="eyebrow">???????</p><h2>??????? ?? ???????</h2></div><span class="badge" id="stageCountBadge">-</span></div>
+        <div class="panel-head"><div><p class="eyebrow">Воронка</p><h2>Прогноз по стадиям</h2></div><span class="badge" id="stageCountBadge">-</span></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>??????</th><th class="num">??????</th><th class="num">??????? ???????????</th><th class="num">????? ? ???????</th><th class="num">????</th></tr></thead>
+            <thead><tr><th>Стадия</th><th class="num">Сделок</th><th class="num">Средняя вероятность</th><th class="num">Вклад в прогноз</th><th class="num">Доля</th></tr></thead>
             <tbody id="stageRows"></tbody>
           </table>
         </div>
       </article>
 
       <article class="panel">
-        <div class="panel-head"><div><p class="eyebrow">?????????</p><h2>??????? ?? ??????????</h2></div><span class="badge">Bitrix source</span></div>
+        <div class="panel-head"><div><p class="eyebrow">Источники</p><h2>Прогноз по источникам</h2></div><span class="badge">Bitrix source</span></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>????????</th><th class="num">??????</th><th class="num">?????</th><th class="num">?????????</th><th class="num">???????</th><th class="num">CPL</th><th class="num">CPA</th></tr></thead>
+            <thead><tr><th>Источник</th><th class="num">Сделок</th><th class="num">Сдали</th><th class="num">Конверсия</th><th class="num">Прогноз</th><th class="num">CPL</th><th class="num">CPA</th></tr></thead>
             <tbody id="sourceRows"></tbody>
           </table>
         </div>
@@ -133,20 +133,20 @@
 
     <section class="grid">
       <article class="panel">
-        <div class="panel-head"><div><p class="eyebrow">??????????</p><h2>??? ??????? ???? ??????????</h2></div><span class="badge" id="managerCountBadge">-</span></div>
+        <div class="panel-head"><div><p class="eyebrow">Сотрудники</p><h2>Кто сколько сдал документов</h2></div><span class="badge" id="managerCountBadge">-</span></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>?????????????</th><th class="num">????? ?????????</th></tr></thead>
+            <thead><tr><th>Ответственный</th><th class="num">Сдали документы</th></tr></thead>
             <tbody id="managerRows"></tbody>
           </table>
         </div>
       </article>
 
       <article class="panel">
-        <div class="panel-head"><div><p class="eyebrow">?????</p><h2>??? ????? ?????? ??????</h2></div><span class="badge bad" id="riskCountBadge">-</span></div>
+        <div class="panel-head"><div><p class="eyebrow">Риски</p><h2>Что нужно дожать сейчас</h2></div><span class="badge bad" id="riskCountBadge">-</span></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>??? ?????</th><th>??????</th><th>??????</th><th>?????????????</th><th class="num">????</th><th>?????????</th></tr></thead>
+            <thead><tr><th>Тип риска</th><th>Сделка</th><th>Стадия</th><th>Ответственный</th><th class="num">Дней</th><th>Приоритет</th></tr></thead>
             <tbody id="riskRows"></tbody>
           </table>
         </div>
@@ -261,7 +261,7 @@
     $("managerCountBadge").textContent = `${num((data.managers || []).length)} менеджеров`;
     $("managerRows").innerHTML = (data.managers || []).map((row) =>
       `<tr><td><strong>${esc(row.manager)}</strong></td><td class="num"><strong>${num(row.submitted)}</strong></td></tr>`
-    ).join("") || `<tr><td colspan="2">??? ??????</td></tr>`;
+    ).join("") || `<tr><td colspan="2">Нет данных</td></tr>`;
 
     $("riskCountBadge").textContent = `${num((data.risks || []).length)} рисков`;
     $("riskRows").innerHTML = (data.risks || []).map((row) =>
