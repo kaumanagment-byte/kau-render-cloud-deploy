@@ -206,6 +206,11 @@ function countOnlineSources(payload) {
   return Object.values(payload?.sources || {}).filter((source) => source?.ok).length;
 }
 
+function allSourcesOnline(payload) {
+  const sources = Object.values(payload?.sources || {});
+  return sources.length > 0 && sources.every((source) => source?.ok);
+}
+
 function bestCachedResponse(key, now) {
   const direct = responseCache.get(key);
   if (direct && now - direct.createdAt < RESPONSE_STALE_TTL_MS) return direct;
@@ -220,7 +225,9 @@ async function unifiedCached(range) {
   const cached = responseCache.get(key);
   const now = Date.now();
 
-  if (cached && now - cached.createdAt < RESPONSE_CACHE_TTL_MS) {
+  // A partial response must never block recovery for five minutes. Retry it on the
+  // next request so sleeping upstream services can replace 4/10 with a healthy 10/10.
+  if (cached && allSourcesOnline(cached.payload) && now - cached.createdAt < RESPONSE_CACHE_TTL_MS) {
     return { ...cached.payload, cache: { status: "fresh", ageSeconds: Math.round((now - cached.createdAt) / 1000) } };
   }
 
@@ -245,7 +252,9 @@ async function unifiedCached(range) {
       };
     }
 
-    if (onlineSources > 0) {
+    // Only a complete response is safe to serve as a fresh cache entry. Partial
+    // responses are returned to the caller but deliberately remain retryable.
+    if (allSourcesOnline(payload)) {
       responseCache.set(key, { payload, createdAt: Date.now() });
       return { ...payload, cache: { status: "updated", ageSeconds: 0 } };
     }
