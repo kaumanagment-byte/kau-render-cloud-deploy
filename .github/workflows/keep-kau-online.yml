@@ -1,0 +1,54 @@
+name: Keep KAU services online
+
+on:
+  schedule:
+    # 08:00-19:45 Asia/Almaty (UTC+5), every 15 minutes.
+    - cron: "*/15 3-14 * * *"
+    # Final check at 20:00 Asia/Almaty.
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keep-kau-online
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  warm-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wake upstream Render services
+        shell: bash
+        run: |
+          set -euo pipefail
+          for url in \
+            "https://kau-ads-service.onrender.com/health" \
+            "https://kau-intelligence-service.onrender.com/health" \
+            "https://kau-crm-service.onrender.com/health"
+          do
+            curl --fail --silent --show-error \
+              --retry 3 --retry-all-errors --retry-delay 5 \
+              --connect-timeout 20 --max-time 90 "$url" >/dev/null
+          done
+
+      - name: Warm dashboard and require 10 of 10 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --retry 2 --retry-all-errors --retry-delay 8 \
+            --connect-timeout 20 --max-time 180 \
+            "https://kau-command-center-api-cloud.onrender.com/api/unified?range=7d" \
+            --output unified.json
+
+          online="$(jq '[.sources[] | select(.ok == true)] | length' unified.json)"
+          total="$(jq '.sources | length' unified.json)"
+          echo "KAU sources online: ${online}/${total}"
+
+          if [ "$online" -ne 10 ] || [ "$total" -ne 10 ]; then
+            jq '{fetchedAt, cache, offline: [.sources | to_entries[] | select(.value.ok != true)]}' unified.json
+            exit 1
+          fi
