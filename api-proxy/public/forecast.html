@@ -197,6 +197,11 @@
   const $ = (id) => document.getElementById(id);
   const num = (v) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(Number(v || 0));
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  const API_ORIGIN = "https://kau-command-center-api-cloud.onrender.com";
+  const apiBase = (
+    location.protocol === "file:" ||
+    !["kau-command-center-api-cloud.onrender.com", "localhost", "127.0.0.1"].includes(location.hostname)
+  ) ? API_ORIGIN : "";
   const bar = (id, pct) => $(id).style.width = `${Math.max(0, Math.min(100, Number(pct || 0)))}%`;
 
   function riskBadgeClass(key) {
@@ -291,7 +296,7 @@
     $("refresh").disabled = true;
     $("refresh").textContent = "Обновляю";
     try {
-      const response = await fetch("/api/enrollment-forecast", { cache: "no-store" });
+      const response = await fetch(`${apiBase}/api/enrollment-forecast`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || data.ok === false) throw new Error(data.error || `HTTP ${response.status}`);
       renderData(data);
