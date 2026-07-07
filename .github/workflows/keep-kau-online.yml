@@ -2,8 +2,9 @@ name: Keep KAU services online
 
 on:
   schedule:
-    # 08:00-19:45 Asia/Almaty (UTC+5), every 15 minutes.
-    - cron: "*/15 3-14 * * *"
+    # 08:00-19:50 Asia/Almaty (UTC+5), every 10 minutes.
+    # Render free instances can sleep right around the 15-minute mark, so 10 minutes is safer.
+    - cron: "*/10 3-14 * * *"
     # Final check at 20:00 Asia/Almaty.
     - cron: "0 15 * * *"
   workflow_dispatch:
@@ -18,37 +19,66 @@ permissions:
 jobs:
   warm-and-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 14
     steps:
-      - name: Wake upstream Render services
+      - name: Warm KAU Render services until dashboard is complete
         shell: bash
         run: |
-          set -euo pipefail
-          for url in \
-            "https://kau-ads-service.onrender.com/health" \
-            "https://kau-intelligence-service.onrender.com/health" \
+          set -u
+
+          api="https://kau-command-center-api-cloud.onrender.com"
+          urls=(
+            "https://kau-ads-service.onrender.com/health"
+            "https://kau-intelligence-service.onrender.com/health"
             "https://kau-crm-service.onrender.com/health"
-          do
-            curl --fail --silent --show-error \
-              --retry 3 --retry-all-errors --retry-delay 5 \
-              --connect-timeout 20 --max-time 90 "$url" >/dev/null
+            "https://kau-ads-service.onrender.com/api/dashboard?range=7d"
+            "https://kau-intelligence-service.onrender.com/api/status"
+            "https://kau-intelligence-service.onrender.com/api/livedune/accounts"
+            "https://kau-intelligence-service.onrender.com/api/livedune/comparison"
+            "https://kau-crm-service.onrender.com/api/deal-dashboard?range=7d"
+          )
+
+          best_online=0
+          best_total=0
+
+          for attempt in 1 2 3 4; do
+            echo "KAU warmup attempt ${attempt}/4"
+
+            for url in "${urls[@]}"; do
+              curl --silent --show-error --location \
+                --retry 2 --retry-all-errors --retry-delay 6 \
+                --connect-timeout 25 --max-time 150 \
+                "$url" >/dev/null || true
+              sleep 2
+            done
+
+            curl --silent --show-error --location \
+              --retry 2 --retry-all-errors --retry-delay 8 \
+              --connect-timeout 25 --max-time 220 \
+              "${api}/api/unified?range=7d&warmupAttempt=${attempt}" \
+              --output unified.json || true
+
+            if ! jq -e '.sources' unified.json >/dev/null 2>&1; then
+              echo "Unified did not return valid sources on attempt ${attempt}"
+              cat unified.json || true
+              sleep 25
+              continue
+            fi
+
+            online="$(jq '[.sources[] | select(.ok == true)] | length' unified.json)"
+            total="$(jq '.sources | length' unified.json)"
+            best_online="$online"
+            best_total="$total"
+            echo "KAU sources online: ${online}/${total}"
+
+            if [ "$online" -eq 10 ] && [ "$total" -eq 10 ]; then
+              echo "KAU dashboard is fully awake: 10/10"
+              exit 0
+            fi
+
+            jq '{fetchedAt, cache, offline: [.sources | to_entries[] | select(.value.ok != true)]}' unified.json || true
+            sleep 35
           done
 
-      - name: Warm dashboard and require 10 of 10 sources
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error \
-            --retry 2 --retry-all-errors --retry-delay 8 \
-            --connect-timeout 20 --max-time 180 \
-            "https://kau-command-center-api-cloud.onrender.com/api/unified?range=7d" \
-            --output unified.json
-
-          online="$(jq '[.sources[] | select(.ok == true)] | length' unified.json)"
-          total="$(jq '.sources | length' unified.json)"
-          echo "KAU sources online: ${online}/${total}"
-
-          if [ "$online" -ne 10 ] || [ "$total" -ne 10 ]; then
-            jq '{fetchedAt, cache, offline: [.sources | to_entries[] | select(.value.ok != true)]}' unified.json
-            exit 1
-          fi
+          echo "KAU keepalive failed after repeated warmup. Best result: ${best_online}/${best_total}"
+          exit 1
