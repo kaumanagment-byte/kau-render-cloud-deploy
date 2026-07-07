@@ -160,11 +160,11 @@ async function unified(range) {
     await sleep(350);
     return result;
   };
-  const ads = await request(`${ADS_BASE_URL}/api/dashboard?range=${encodeURIComponent(range)}`, 25000);
-  const status = await request(`${INTELLIGENCE_BASE_URL}/api/status`, 10000);
-  const accounts = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/accounts`, 12000);
-  const comparison = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/comparison`, 12000);
-  const crm = await request(`${CRM_BASE_URL}/api/deal-dashboard?range=${encodeURIComponent(range)}`, 45000);
+  const ads = await request(`${ADS_BASE_URL}/api/dashboard?range=${encodeURIComponent(range)}`, 60000);
+  const status = await request(`${INTELLIGENCE_BASE_URL}/api/status`, 20000);
+  const accounts = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/accounts`, 25000);
+  const comparison = await request(`${INTELLIGENCE_BASE_URL}/api/livedune/comparison`, 25000);
+  const crm = await request(`${CRM_BASE_URL}/api/deal-dashboard?range=${encodeURIComponent(range)}`, 70000);
   let localSignals = null;
   try {
     localSignals = await kauSignals();
@@ -211,6 +211,33 @@ function allSourcesOnline(payload) {
   return sources.length > 0 && sources.every((source) => source?.ok);
 }
 
+async function unifiedWithWarmRetries(range, attempts = 3) {
+  let best = null;
+  let bestOnlineSources = -1;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const payload = await unified(range);
+    const onlineSources = countOnlineSources(payload);
+    if (onlineSources > bestOnlineSources) {
+      best = payload;
+      bestOnlineSources = onlineSources;
+    }
+
+    if (allSourcesOnline(payload)) {
+      return { ...payload, warmup: { status: "complete", attempt, attempts } };
+    }
+
+    if (attempt < attempts) {
+      await sleep(8000 + attempt * 7000);
+    }
+  }
+
+  return {
+    ...(best || { fetchedAt: new Date().toISOString(), range, sources: {} }),
+    warmup: { status: "partial", attempts, onlineSources: Math.max(0, bestOnlineSources) },
+  };
+}
+
 function bestCachedResponse(key, now) {
   const direct = responseCache.get(key);
   if (direct && now - direct.createdAt < RESPONSE_STALE_TTL_MS) return direct;
@@ -236,7 +263,7 @@ async function unifiedCached(range) {
   }
 
   const request = (async () => {
-    const payload = await unified(key);
+    const payload = await unifiedWithWarmRetries(key);
     const onlineSources = countOnlineSources(payload);
     const fallback = bestCachedResponse(key, now);
     const fallbackOnlineSources = countOnlineSources(fallback?.payload);
