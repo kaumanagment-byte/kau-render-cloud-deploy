@@ -147,17 +147,17 @@ async function unified(range) {
   // Wake sleeping Render services before requesting their heavier dashboards.
   // Free instances often return 429 during the first burst immediately after a deploy.
   await fetchJson(`${ADS_BASE_URL}/health`, 60000);
-  await sleep(800);
+  await sleep(3000);
   await fetchJson(`${INTELLIGENCE_BASE_URL}/health`, 60000);
-  await sleep(800);
+  await sleep(3000);
   await fetchJson(`${CRM_BASE_URL}/health`, 60000);
-  await sleep(1800);
+  await sleep(5000);
 
   // Render's free services throttle a burst of parallel service-to-service calls.
   // A short sequential warm-up keeps the unified dashboard below that limit.
   const request = async (url, timeout) => {
     const result = await fetchJson(url, timeout);
-    await sleep(350);
+    await sleep(5000);
     return result;
   };
   const ads = await request(`${ADS_BASE_URL}/api/dashboard?range=${encodeURIComponent(range)}`, 60000);
@@ -211,33 +211,6 @@ function allSourcesOnline(payload) {
   return sources.length > 0 && sources.every((source) => source?.ok);
 }
 
-async function unifiedWithWarmRetries(range, attempts = 3) {
-  let best = null;
-  let bestOnlineSources = -1;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const payload = await unified(range);
-    const onlineSources = countOnlineSources(payload);
-    if (onlineSources > bestOnlineSources) {
-      best = payload;
-      bestOnlineSources = onlineSources;
-    }
-
-    if (allSourcesOnline(payload)) {
-      return { ...payload, warmup: { status: "complete", attempt, attempts } };
-    }
-
-    if (attempt < attempts) {
-      await sleep(8000 + attempt * 7000);
-    }
-  }
-
-  return {
-    ...(best || { fetchedAt: new Date().toISOString(), range, sources: {} }),
-    warmup: { status: "partial", attempts, onlineSources: Math.max(0, bestOnlineSources) },
-  };
-}
-
 function bestCachedResponse(key, now) {
   const direct = responseCache.get(key);
   if (direct && now - direct.createdAt < RESPONSE_STALE_TTL_MS) return direct;
@@ -263,7 +236,7 @@ async function unifiedCached(range) {
   }
 
   const request = (async () => {
-    const payload = await unifiedWithWarmRetries(key);
+    const payload = await unified(key);
     const onlineSources = countOnlineSources(payload);
     const fallback = bestCachedResponse(key, now);
     const fallbackOnlineSources = countOnlineSources(fallback?.payload);
@@ -285,6 +258,7 @@ async function unifiedCached(range) {
       responseCache.set(key, { payload, createdAt: Date.now() });
       return { ...payload, cache: { status: "updated", ageSeconds: 0 } };
     }
+
     if (fallback) {
       return {
         ...fallback.payload,
