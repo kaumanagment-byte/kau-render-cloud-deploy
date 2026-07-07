@@ -183,7 +183,11 @@
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-  const apiBase = location.protocol === "file:" ? "https://kau-command-center-api-cloud.onrender.com" : "";
+  const API_ORIGIN = "https://kau-command-center-api-cloud.onrender.com";
+  const apiBase = (
+    location.protocol === "file:" ||
+    !["kau-command-center-api-cloud.onrender.com", "localhost", "127.0.0.1"].includes(location.hostname)
+  ) ? API_ORIGIN : "";
 
   function formatDate(value) {
     if (!value) return "дата не указана";
