@@ -6,6 +6,18 @@ const state = {
   sortDirection: "desc",
 };
 
+const API_ORIGIN = (
+  window.KAU_CRM_API_BASE ||
+  document.currentScript?.dataset?.apiBase ||
+  ((location.protocol === "file:" || !["kau-crm-service.onrender.com", "localhost", "127.0.0.1"].includes(location.hostname))
+    ? "https://kau-command-center-api-cloud.onrender.com"
+    : "")
+).replace(/\/$/, "");
+
+function apiUrl(path) {
+  return `${API_ORIGIN}${path}`;
+}
+
 const els = {
   connectionDot: document.querySelector("#connection-dot"),
   connectionText: document.querySelector("#connection-text"),
@@ -43,7 +55,7 @@ async function bootstrap() {
 }
 
 async function loadConfig() {
-  const config = await fetchJson("/api/config");
+  const config = await fetchJson(apiUrl("/api/config"));
   state.config = config;
   els.polling.value = String(config.pollIntervalSeconds || 15);
   setConnection(config.configured ? "live" : "demo", config.configured ? "Webhook настроен" : "Демо-режим");
@@ -54,7 +66,7 @@ async function refresh() {
     const params = new URLSearchParams({ range: els.range.value });
     if (els.managerFilter.value) params.set("manager", els.managerFilter.value);
 
-    const payload = await fetchJson(`/api/deal-dashboard?${params.toString()}`);
+    const payload = await fetchJson(apiUrl(`/api/deal-dashboard?${params.toString()}`));
     state.dashboard = payload;
     syncManagerFilter(payload.users || [], payload.filters?.managerId || "");
     render(payload);
@@ -204,7 +216,7 @@ function renderRecent(items) {
 }
 
 async function fetchJson(url) {
-  const response = await fetch(url);
+  const response = await fetch(url, { cache: "no-store", credentials: "omit" });
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.message || payload.error || "Request failed");
   return payload;
