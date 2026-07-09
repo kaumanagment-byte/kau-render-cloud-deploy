@@ -85,6 +85,15 @@ async function fetchJson(url, timeoutMs = 35000, retries = 2) {
   return last || { ok: false, error: "Request failed" };
 }
 
+async function proxyJson(res, targetUrl, timeoutMs = 70000) {
+  const result = await fetchJson(targetUrl, timeoutMs);
+  if (result.ok) {
+    send(res, 200, result.payload);
+    return;
+  }
+  send(res, 502, { ok: false, error: result.error || "Upstream request failed" });
+}
+
 function formatNumber(value) {
   return new Intl.NumberFormat("ru-RU").format(Number(value || 0));
 }
@@ -258,7 +267,6 @@ async function unifiedCached(range) {
       responseCache.set(key, { payload, createdAt: Date.now() });
       return { ...payload, cache: { status: "updated", ageSeconds: 0 } };
     }
-
     if (fallback) {
       return {
         ...fallback.payload,
@@ -296,6 +304,16 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/unified") {
     send(res, 200, await unifiedCached(url.searchParams.get("range") || "7d"));
+    return;
+  }
+
+  if (url.pathname === "/api/config") {
+    await proxyJson(res, `${CRM_BASE_URL}/api/config`, 30000);
+    return;
+  }
+
+  if (url.pathname === "/api/deal-dashboard") {
+    await proxyJson(res, `${CRM_BASE_URL}/api/deal-dashboard${url.search}`, 90000);
     return;
   }
 
