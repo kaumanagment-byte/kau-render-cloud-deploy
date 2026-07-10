@@ -94,6 +94,21 @@ async function proxyJson(res, targetUrl, timeoutMs = 70000) {
   send(res, 502, { ok: false, error: result.error || "Upstream request failed" });
 }
 
+async function wakeUpstreamServices() {
+  const targets = [
+    `${ADS_BASE_URL}/health`,
+    `${INTELLIGENCE_BASE_URL}/health`,
+    `${CRM_BASE_URL}/health`,
+  ];
+  const results = [];
+  for (const target of targets) {
+    const result = await fetchJson(target, 60000, 1);
+    results.push({ target, ok: result.ok, error: result.error || null });
+    await sleep(2500);
+  }
+  return results;
+}
+
 function formatNumber(value) {
   return new Intl.NumberFormat("ru-RU").format(Number(value || 0));
 }
@@ -298,7 +313,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/health") {
-    send(res, 200, { ok: true, fetchedAt: new Date().toISOString() });
+    const deep = url.searchParams.get("deep") === "1";
+    if (deep) {
+      send(res, 200, { ok: true, fetchedAt: new Date().toISOString(), upstream: await wakeUpstreamServices() });
+      return;
+    }
+    wakeUpstreamServices().catch((error) => console.error("Background upstream wake failed", error));
+    send(res, 200, { ok: true, fetchedAt: new Date().toISOString(), wake: "started" });
     return;
   }
 
