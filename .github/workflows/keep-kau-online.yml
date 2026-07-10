@@ -1,6 +1,10 @@
 name: Keep KAU services online
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/keep-kau-online.yml"
   schedule:
     # 08:00-19:50 Asia/Almaty (UTC+5), every 10 minutes.
     # Keep this lightweight: health checks prevent sleep without hammering data APIs.
