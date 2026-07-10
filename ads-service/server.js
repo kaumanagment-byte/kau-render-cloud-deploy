@@ -6,7 +6,12 @@ const crypto = require("crypto");
 loadEnv(path.join(__dirname, ".env"));
 
 const PORT = Number(process.env.PORT || 8123);
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const BASE_URL = (
+  process.env.BASE_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  (process.env.RENDER_EXTERNAL_HOSTNAME ? `https://${process.env.RENDER_EXTERNAL_HOSTNAME}` : '') ||
+  'https://kau-ads-service.onrender.com'
+).replace(/\/$/, '');
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v24.0";
 const META_APP_ID = process.env.META_APP_ID || "";
 const META_APP_SECRET = process.env.META_APP_SECRET || "";
@@ -418,20 +423,55 @@ function normalizeMetaTarget(row, account) {
   };
 }
 
+function metaIssueCampaign(message) {
+  return {
+    accountId: 'meta',
+    name: `Meta требует внимания: ${message}`,
+    platform: 'Meta',
+    spend: 0,
+    revenue: 0,
+    conversions: 0,
+    status: 'Review',
+  };
+}
+
 async function getMetaDashboard(range) {
   const session = getSession();
   if (!session?.accessToken) {
+    const configured = Boolean((META_APP_ID && META_APP_SECRET) || META_ACCESS_TOKEN);
     return {
-      metaConfigured: Boolean((META_APP_ID && META_APP_SECRET) || META_ACCESS_TOKEN),
+      metaConfigured: configured,
       metaConnected: false,
       accounts: [],
-      campaigns: [],
+      campaigns: [
+        metaIssueCampaign(
+          configured
+            ? 'нужно заново авторизовать рекламный кабинет'
+            : 'OAuth не настроен, нужны META_APP_ID и META_APP_SECRET'
+        ),
+      ],
       targets: [],
       trend: [],
+      metaError: configured
+        ? 'Meta не авторизована. Открой /api/meta/connect и подключи рекламный кабинет заново.'
+        : 'Meta OAuth не настроен: добавь META_APP_ID и META_APP_SECRET.',
     };
   }
 
   const metaAccounts = await getConfiguredAdAccounts();
+  if (!metaAccounts.length) {
+    return {
+      metaConfigured: true,
+      metaConnected: true,
+      accounts: [],
+      campaigns: [
+        metaIssueCampaign('токен работает, но доступных рекламных аккаунтов не найдено'),
+      ],
+      targets: [],
+      trend: [],
+      metaError: 'Meta вернула 0 рекламных аккаунтов. Проверь доступ пользователя к Business Manager / Ad Account.',
+    };
+  }
   const normalizedAccounts = metaAccounts.map((account) => ({
     id: account.id,
     platform: "Meta",
