@@ -7,7 +7,7 @@ on:
       - ".github/workflows/keep-kau-online.yml"
   schedule:
     # 08:00-19:50 Asia/Almaty (UTC+5), every 10 minutes.
-    # Keep this lightweight: health checks prevent sleep without hammering data APIs.
+    # Keep this lightweight: deep health wakes upstream services without hammering data APIs.
     - cron: "*/10 3-14 * * *"
     # Final lightweight check at 20:00 Asia/Almaty.
     - cron: "0 15 * * *"
@@ -25,21 +25,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Keep Render services awake without triggering API rate limits
+      - name: Wake all KAU Render services from command center
         shell: bash
         run: |
           set -euo pipefail
-          for url in \
-            "https://kau-ads-service.onrender.com/health" \
-            "https://kau-intelligence-service.onrender.com/health" \
-            "https://kau-crm-service.onrender.com/health" \
-            "https://kau-command-center-api-cloud.onrender.com/health"
-          do
-            echo "Waking ${url}"
-            curl --fail --silent --show-error --location \
-              --retry 2 --retry-all-errors --retry-delay 8 \
-              --connect-timeout 25 --max-time 90 "$url" >/dev/null
-            sleep 6
-          done
+          url="https://kau-command-center-api-cloud.onrender.com/health?deep=1"
+          echo "Waking KAU stack through ${url}"
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-all-errors --retry-delay 10 \
+            --connect-timeout 25 --max-time 180 "$url" | tee health.json
 
-          echo "KAU services received lightweight keepalive pings. Heavy dashboards are loaded on user refresh to avoid HTTP 429."
+          node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync("health.json","utf8")); const bad=(data.upstream||[]).filter(x=>!x.ok); console.log("Upstream:", (data.upstream||[]).map(x=>`${x.ok?"ok":"bad"}:${x.target}`).join(" | ")); if (!data.ok || bad.length) process.exit(1);'
+
+          echo "KAU services received deep keepalive pings. Heavy dashboards are loaded on user refresh to avoid HTTP 429."
