@@ -1,0 +1,69 @@
+name: Apply Meta Ads Visibility Fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-meta-ads-fix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch ads service Meta handling
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const file = 'ads-service/server.js';
+          let source = fs.readFileSync(file, 'utf8');
+
+          if (source.includes('function metaIssueCampaign(message)')) {
+            console.log('Meta ads fix already applied.');
+            process.exit(0);
+          }
+
+          source = source.replace(
+            'const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;',
+            `const BASE_URL = (\n  process.env.BASE_URL ||\n  process.env.RENDER_EXTERNAL_URL ||\n  (process.env.RENDER_EXTERNAL_HOSTNAME ? \`https://\${process.env.RENDER_EXTERNAL_HOSTNAME}\` : '') ||\n  'https://kau-ads-service.onrender.com'\n).replace(/\\/$/, '');`
+          );
+
+          source = source.replace(
+            'async function getMetaDashboard(range) {\n',
+            `function metaIssueCampaign(message) {\n  return {\n    accountId: 'meta',\n    name: \`Meta требует внимания: \${message}\`,\n    platform: 'Meta',\n    spend: 0,\n    revenue: 0,\n    conversions: 0,\n    status: 'Review',\n  };\n}\n\nasync function getMetaDashboard(range) {\n`
+          );
+
+          source = source.replace(
+            `  if (!session?.accessToken) {\n    return {\n      metaConfigured: Boolean((META_APP_ID && META_APP_SECRET) || META_ACCESS_TOKEN),\n      metaConnected: false,\n      accounts: [],\n      campaigns: [],\n      targets: [],\n      trend: [],\n    };\n  }\n\n  const metaAccounts = await getConfiguredAdAccounts();`,
+            `  if (!session?.accessToken) {\n    const configured = Boolean((META_APP_ID && META_APP_SECRET) || META_ACCESS_TOKEN);\n    return {\n      metaConfigured: configured,\n      metaConnected: false,\n      accounts: [],\n      campaigns: [\n        metaIssueCampaign(\n          configured\n            ? 'нужно заново авторизовать рекламный кабинет'\n            : 'OAuth не настроен, нужны META_APP_ID и META_APP_SECRET'\n        ),\n      ],\n      targets: [],\n      trend: [],\n      metaError: configured\n        ? 'Meta не авторизована. Открой /api/meta/connect и подключи рекламный кабинет заново.'\n        : 'Meta OAuth не настроен: добавь META_APP_ID и META_APP_SECRET.',\n    };\n  }\n\n  const metaAccounts = await getConfiguredAdAccounts();\n  if (!metaAccounts.length) {\n    return {\n      metaConfigured: true,\n      metaConnected: true,\n      accounts: [],\n      campaigns: [\n        metaIssueCampaign('токен работает, но доступных рекламных аккаунтов не найдено'),\n      ],\n      targets: [],\n      trend: [],\n      metaError: 'Meta вернула 0 рекламных аккаунтов. Проверь доступ пользователя к Business Manager / Ad Account.',\n    };\n  }`
+          );
+
+          source = source.replace(
+            `    campaigns: [...(meta.campaigns || []), ...(tiktok.campaigns || []), ...(google.campaigns || [])].filter(\n      (campaign) => !(['meta', 'tiktok', 'google'].includes(campaign.accountId) && campaign.status === 'Review')\n    ),`,
+            `    campaigns: [...(meta.campaigns || []), ...(tiktok.campaigns || []), ...(google.campaigns || [])],`
+          );
+
+          if (!source.includes('function metaIssueCampaign(message)')) {
+            throw new Error('Patch did not apply: metaIssueCampaign marker missing');
+          }
+
+          fs.writeFileSync(file, source);
+          NODE
+      - name: Validate JavaScript
+        run: node --check ads-service/server.js
+      - name: Commit patched Ads service
+        run: |
+          if git diff --quiet ads-service/server.js; then
+            echo "No Ads service changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ads-service/server.js
+          git commit -m "Show Meta ads connection failures"
+          git push
